@@ -37,12 +37,8 @@ export class DependencyItem extends vscode.TreeItem {
   public readonly latestVersion: string | undefined;
 
   constructor(options: DependencyItemOptions) {
-    const label =
-      options.kind === 'package' && options.isUnused
-        ? `⚠️ ${options.label}`
-        : options.label;
-
-    super(label, options.collapsibleState);
+    // Drop the emoji prefix — the icon colour carries the unused signal instead
+    super(options.label, options.collapsibleState);
 
     this.kind = options.kind;
     this.packageName = options.packageName;
@@ -57,42 +53,62 @@ export class DependencyItem extends vscode.TreeItem {
 
       const isOutdated = Boolean(options.latestVersion);
 
-      if (isOutdated) {
+      if (isOutdated && this.isUnused) {
+        // Outdated AND unused — red circle-slash icon
         this.iconPath = new vscode.ThemeIcon(
-          'arrow-up',
-          new vscode.ThemeColor('charts.green')
+          'circle-slash',
+          new vscode.ThemeColor('errorForeground')
         );
-      } else if (options.isUnused) {
-        this.iconPath = new vscode.ThemeIcon('warning');
+      } else if (isOutdated) {
+        // Has an update — blue arrow-circle-up
+        this.iconPath = new vscode.ThemeIcon(
+          'arrow-circle-up',
+          new vscode.ThemeColor('charts.blue')
+        );
+      } else if (this.isUnused) {
+        // Unused — yellow warning icon
+        this.iconPath = new vscode.ThemeIcon(
+          'warning',
+          new vscode.ThemeColor('editorWarning.foreground')
+        );
       } else {
-        this.iconPath = new vscode.ThemeIcon('package');
+        // Healthy — green circle-filled
+        this.iconPath = new vscode.ThemeIcon(
+          'circle-filled',
+          new vscode.ThemeColor('testing.iconPassed')
+        );
       }
 
-      const unusedNote = options.isUnused
-        ? '\n\n⚠️ _Not found in any scanned source file_'
+      const unusedNote = this.isUnused
+        ? '\n\n$(warning) _Not found in any scanned source file_'
         : '';
       const outdatedNote = isOutdated
-        ? `\n\n🔼 **Update available:** \`${options.packageVersion}\` → \`${options.latestVersion}\``
+        ? `\n\n$(arrow-circle-up) **Update available:** \`${options.packageVersion}\` → \`${options.latestVersion}\``
         : '';
 
       this.tooltip = new vscode.MarkdownString(
-        `**${options.packageName}**\n\n` +
+        `$(package) **${options.packageName}**\n\n` +
           `Version: \`${options.packageVersion}\`\n\n` +
-          `${options.isDev ? '_Dev dependency_' : '_Dependency_'}` +
+          `${options.isDev ? '$(tools) _Dev dependency_' : '$(library) _Dependency_'}` +
           outdatedNote +
-          unusedNote
+          unusedNote,
+        true  // enable icon rendering in tooltip
       );
     } else if (options.kind === 'loading') {
       this.iconPath = new vscode.ThemeIcon('loading~spin');
       this.contextValue = 'loading';
     } else if (options.kind === 'error') {
-      this.iconPath = new vscode.ThemeIcon('error');
+      this.iconPath = new vscode.ThemeIcon(
+        'error',
+        new vscode.ThemeColor('errorForeground')
+      );
       this.contextValue = 'error';
     } else {
       // group
       this.contextValue = 'group';
       this.iconPath = new vscode.ThemeIcon(
-        options.isDev ? 'tools' : 'library'
+        options.isDev ? 'beaker' : 'package',
+        new vscode.ThemeColor(options.isDev ? 'charts.purple' : 'charts.blue')
       );
       if (options.badge) {
         this.description = options.badge;
