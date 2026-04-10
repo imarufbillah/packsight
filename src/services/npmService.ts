@@ -239,6 +239,40 @@ export async function getPackageSizes(
   return result;
 }
 
+/**
+ * Fetches the release history for a package from the npm registry.
+ * Returns up to `limit` most-recent versions with their publish dates,
+ * sorted newest-first.
+ *
+ * Uses `npm view <pkg> time --json` which returns a map of
+ * { version: isoDate, ... } plus "created" and "modified" meta-keys.
+ */
+export async function getPackageChangelog(
+  name: string,
+  limit = 20
+): Promise<Array<{ version: string; date: string }>> {
+  return new Promise((resolve) => {
+    cp.exec(
+      `npm view ${name} time --json`,
+      { timeout: 15000 },
+      (error, stdout) => {
+        if (error || !stdout.trim()) { resolve([]); return; }
+        try {
+          const raw = JSON.parse(stdout.trim()) as Record<string, string>;
+          const entries = Object.entries(raw)
+            .filter(([key]) => key !== 'created' && key !== 'modified')
+            .map(([version, date]) => ({ version, date }))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, limit);
+          resolve(entries);
+        } catch {
+          resolve([]);
+        }
+      }
+    );
+  });
+}
+
 interface ExecError {
   stdout: string;
   stderr: string;

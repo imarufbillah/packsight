@@ -680,6 +680,129 @@ export function getDashboardHtml(
       color: var(--vscode-foreground);
     }
     #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+    /* ── Changelog modal ─────────────────────────────────────────────────── */
+    #changelog-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+    }
+    #changelog-backdrop.visible { display: flex; }
+    #changelog-modal {
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px 24px;
+      min-width: 340px;
+      max-width: 520px;
+      width: 90vw;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-modal);
+      animation: fadeUp 0.2s ease both;
+    }
+    #changelog-modal h3 {
+      font-family: 'Syne', var(--vscode-font-family), sans-serif;
+      font-size: 1.05em;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--vscode-foreground);
+      letter-spacing: -0.01em;
+    }
+    #changelog-subtitle {
+      font-size: 0.80em;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 18px;
+    }
+    #changelog-list-wrap {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .changelog-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88em;
+    }
+    .changelog-table thead th {
+      text-align: left;
+      padding: 6px 10px;
+      color: var(--vscode-descriptionForeground);
+      background: color-mix(in srgb, var(--vscode-foreground) 5%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+    .changelog-table tbody tr {
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 40%, transparent);
+      transition: background var(--transition-fast);
+    }
+    .changelog-table tbody tr:last-child { border-bottom: none; }
+    .changelog-table tbody tr:hover {
+      background: color-mix(in srgb, var(--vscode-list-hoverBackground) 100%, transparent);
+    }
+    .changelog-table td {
+      padding: 8px 10px;
+      vertical-align: middle;
+    }
+    .changelog-version {
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-weight: 600;
+      font-size: 0.92em;
+    }
+    .changelog-version.is-installed {
+      color: var(--accent-blue);
+    }
+    .changelog-installed-tag {
+      display: inline-block;
+      font-size: 0.65em;
+      color: var(--accent-blue);
+      background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent-blue) 28%, transparent);
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .changelog-date {
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-size: 0.82em;
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
+    #changelog-loading {
+      text-align: center;
+      padding: 32px 0;
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.88em;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    #changelog-error {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--accent-red);
+      font-size: 0.88em;
+    }
+    .changelog-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 18px;
+    }
   </style>
 </head>
 <body>
@@ -790,6 +913,33 @@ export function getDashboardHtml(
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Changelog modal -->
+  <div id="changelog-backdrop" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+    <div id="changelog-modal">
+      <h3 id="changelog-title">Changelog</h3>
+      <div id="changelog-subtitle"></div>
+      <div id="changelog-list-wrap">
+        <div id="changelog-loading">
+          <div class="spinner"></div>
+          <span>Fetching changelog…</span>
+        </div>
+        <div id="changelog-error" style="display:none"></div>
+        <table class="changelog-table" id="changelog-table" style="display:none" aria-label="Package version history">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Published</th>
+            </tr>
+          </thead>
+          <tbody id="changelog-tbody"></tbody>
+        </table>
+      </div>
+      <div class="changelog-footer">
+        <button class="btn-secondary" id="changelog-close">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Confirm modal -->
@@ -1060,6 +1210,10 @@ export function getDashboardHtml(
           <td>\${statusBadge(pkg)}</td>
           <td class="actions-cell">
             \${updateBtn}
+            <button class="btn-secondary btn-changelog"
+              data-name="\${esc(pkg.name)}"
+              data-version="\${esc(pkg.version)}"
+              title="View changelog for \${esc(pkg.name)}">Changelog</button>
             <button class="btn-danger btn-uninstall"
               data-name="\${esc(pkg.name)}"
               data-dev="\${pkg.isDev}"
@@ -1122,6 +1276,44 @@ export function getDashboardHtml(
         case 'operationError':
           setLoading(false);
           showToast(msg.message, 'error');
+          break;
+
+        case 'changelogData': {
+          if (msg.packageName !== changelogPackage) break;
+          document.getElementById('changelog-loading').style.display = 'none';
+          document.getElementById('changelog-error').style.display   = 'none';
+          const tbody = document.getElementById('changelog-tbody');
+          if (!msg.entries || msg.entries.length === 0) {
+            document.getElementById('changelog-error').style.display = 'block';
+            document.getElementById('changelog-error').textContent   = 'No version history available.';
+            break;
+          }
+          // Find the installed version to highlight it
+          const installedPkg = allPackages.find(p => p.name === msg.packageName);
+          const installedClean = installedPkg
+            ? installedPkg.version.replace(/^[\\^~>=<\\s]+/, '')
+            : '';
+          tbody.innerHTML = msg.entries.map(entry => {
+            const isInstalled = entry.version === installedClean;
+            const d = new Date(entry.date);
+            const dateStr = isNaN(d.getTime()) ? entry.date : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            return '<tr>' +
+              '<td class="changelog-version' + (isInstalled ? ' is-installed' : '') + '">' +
+                esc(entry.version) +
+                (isInstalled ? '<span class="changelog-installed-tag">installed</span>' : '') +
+              '</td>' +
+              '<td class="changelog-date">' + esc(dateStr) + '</td>' +
+              '</tr>';
+          }).join('');
+          document.getElementById('changelog-table').style.display = 'table';
+          break;
+        }
+
+        case 'changelogError':
+          if (msg.packageName !== changelogPackage) break;
+          document.getElementById('changelog-loading').style.display = 'none';
+          document.getElementById('changelog-error').style.display   = 'block';
+          document.getElementById('changelog-error').textContent     = 'Failed to load changelog: ' + msg.message;
           break;
       }
     });
@@ -1263,6 +1455,44 @@ export function getDashboardHtml(
           'btn-danger',
           () => vscode.postMessage({ command: 'uninstall', packageName: name, isDev })
         );
+      }
+    });
+
+    // ── Changelog modal ────────────────────────────────────────────────────
+    let changelogPackage = null; // name of the package whose changelog is open
+
+    function openChangelog(packageName, installedVersion) {
+      changelogPackage = packageName;
+      document.getElementById('changelog-title').textContent = packageName;
+      document.getElementById('changelog-subtitle').textContent = 'Installed: ' + installedVersion;
+      document.getElementById('changelog-loading').style.display = 'flex';
+      document.getElementById('changelog-error').style.display   = 'none';
+      document.getElementById('changelog-table').style.display   = 'none';
+      document.getElementById('changelog-backdrop').classList.add('visible');
+      vscode.postMessage({ command: 'fetchChangelog', packageName });
+    }
+
+    function closeChangelog() {
+      document.getElementById('changelog-backdrop').classList.remove('visible');
+      changelogPackage = null;
+    }
+
+    document.getElementById('changelog-close').addEventListener('click', closeChangelog);
+    document.getElementById('changelog-backdrop').addEventListener('click', e => {
+      if (e.target === document.getElementById('changelog-backdrop')) closeChangelog();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('changelog-backdrop').classList.contains('visible')) {
+        closeChangelog();
+      }
+    });
+
+    // Changelog button delegation
+    document.getElementById('pkg-tbody').addEventListener('click', e => {
+      const target = e.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      if (target.classList.contains('btn-changelog')) {
+        openChangelog(target.dataset.name, target.dataset.version);
       }
     });
 

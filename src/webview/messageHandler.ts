@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { runCommand } from '../services/npmService';
+import { runCommand, getPackageChangelog } from '../services/npmService';
 import { ExtensionMessage, WebviewMessage } from '../types/dashboard';
 
 /**
@@ -92,6 +92,18 @@ export async function handleWebviewMessage(
         post({ command: 'operationError', message: `${packageNames.length - failed} updated, ${failed} failed` });
       }
       await onRefresh();
+      break;
+    }
+
+    case 'fetchChangelog': {
+      const { packageName } = message;
+      try {
+        const entries = await getPackageChangelog(packageName);
+        post({ command: 'changelogData', packageName, entries });
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
+        post({ command: 'changelogError', packageName, message: detail });
+      }
       break;
     }
   }

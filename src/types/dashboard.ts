@@ -16,6 +16,14 @@ export interface DashboardData {
   workspaceRoot: string;
 }
 
+// ─── Changelog ───────────────────────────────────────────────────────────────
+
+/** A single version entry in a package changelog */
+export interface ChangelogEntry {
+  version: string;
+  date: string; // ISO date string
+}
+
 // ─── Messages: Webview → Extension ───────────────────────────────────────────
 
 export type WebviewMessage =
@@ -23,7 +31,8 @@ export type WebviewMessage =
   | { command: 'uninstall'; packageName: string; isDev: boolean }
   | { command: 'update'; packageName: string }
   | { command: 'bulkUpdate'; packageNames: string[] }
-  | { command: 'refresh' };
+  | { command: 'refresh' }
+  | { command: 'fetchChangelog'; packageName: string };
 
 // ─── Messages: Extension → Webview ───────────────────────────────────────────
 
@@ -31,4 +40,6 @@ export type ExtensionMessage =
   | { command: 'loadData'; payload: DashboardData }
   | { command: 'operationStart'; packageName: string }
   | { command: 'operationSuccess'; message: string }
-  | { command: 'operationError'; message: string };
+  | { command: 'operationError'; message: string }
+  | { command: 'changelogData'; packageName: string; entries: ChangelogEntry[] }
+  | { command: 'changelogError'; packageName: string; message: string };
