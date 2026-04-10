@@ -130,41 +130,31 @@ export function runCommand(
 }
 
 /**
- * Fetches the publish date of a specific installed package version from the
- * npm registry. Returns an ISO date string or null if unavailable/offline.
+ * Fetches the publish date of a specific installed package version.
+ * Uses `npm view <pkg>@<version> time --json` which reads from the npm
+ * cache when available — fast and no raw HTTP required.
  *
- * Uses the per-version endpoint: GET https://registry.npmjs.org/<name>/<version>
- * which is a small JSON document containing a `time` field.
- *
- * @param name    - Package name
- * @param version - Installed version string (e.g. "1.2.3")
+ * Returns an ISO date string or null if unavailable.
  */
 export async function getPackageLastUpdated(
   name: string,
   version: string
 ): Promise<string | null> {
   return new Promise((resolve) => {
-    // Strip semver range prefixes that may appear in package.json
-    const clean = version.replace(/^[\^~>=<]+/, '');
-    const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(clean)}`;
-
-    const https = require('https') as typeof import('https');
-    const req = https.get(url, { timeout: 5000 }, (res) => {
-      let body = '';
-      res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-      res.on('end', () => {
+    const clean = version.replace(/^[\^~>=<\s]+/, '');
+    cp.exec(
+      `npm view ${name}@${clean} time --json`,
+      { timeout: 10000 },
+      (error, stdout) => {
+        if (error || !stdout.trim()) { resolve(null); return; }
         try {
-          const json = JSON.parse(body) as Record<string, unknown>;
-          // The per-version doc has a top-level `time` string
-          const time = typeof json['time'] === 'string' ? json['time'] : null;
-          resolve(time);
+          const timeMap = JSON.parse(stdout.trim()) as Record<string, string>;
+          resolve(timeMap[clean] ?? null);
         } catch {
           resolve(null);
         }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
+      }
+    );
   });
 }
 
