@@ -129,7 +129,70 @@ export function runCommand(
   });
 }
 
-// ─── Type guards ──────────────────────────────────────────────────────────────
+/**
+ * Fetches the publish date of a specific installed package version from the
+ * npm registry. Returns an ISO date string or null if unavailable/offline.
+ *
+ * Uses the per-version endpoint: GET https://registry.npmjs.org/<name>/<version>
+ * which is a small JSON document containing a `time` field.
+ *
+ * @param name    - Package name
+ * @param version - Installed version string (e.g. "1.2.3")
+ */
+export async function getPackageLastUpdated(
+  name: string,
+  version: string
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    // Strip semver range prefixes that may appear in package.json
+    const clean = version.replace(/^[\^~>=<]+/, '');
+    const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(clean)}`;
+
+    const https = require('https') as typeof import('https');
+    const req = https.get(url, { timeout: 5000 }, (res) => {
+      let body = '';
+      res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body) as Record<string, unknown>;
+          // The per-version doc has a top-level `time` string
+          const time = typeof json['time'] === 'string' ? json['time'] : null;
+          resolve(time);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+/**
+ * Fetches last-updated dates for all packages in parallel, capped at
+ * `concurrency` simultaneous requests to avoid hammering the registry.
+ */
+export async function getPackagesLastUpdated(
+  packages: Array<{ name: string; version: string }>
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const concurrency = 6;
+  let idx = 0;
+
+  async function worker(): Promise<void> {
+    while (idx < packages.length) {
+      const pkg = packages[idx++];
+      const date = await getPackageLastUpdated(pkg.name, pkg.version);
+      if (date !== null) {
+        result.set(pkg.name, date);
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, packages.length) }, worker);
+  await Promise.all(workers);
+  return result;
+}
 
 interface ExecError {
   stdout: string;

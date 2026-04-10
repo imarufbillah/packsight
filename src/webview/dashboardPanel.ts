@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { parseDependencies } from "../services/dependencyService";
-import { getOutdatedPackages } from "../services/npmService";
+import { getOutdatedPackages, getPackagesLastUpdated } from "../services/npmService";
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
@@ -142,6 +142,9 @@ export class DashboardPanel {
         ...devDependencies.map((p) => ({ ...p, isDev: true })),
       ];
 
+      // Fetch last-updated dates from the npm registry in parallel
+      const lastUpdatedMap = await getPackagesLastUpdated(allEntries);
+
       data = {
         workspaceRoot: this.workspaceRoot,
         packages: allEntries.map((entry) => ({
@@ -150,6 +153,7 @@ export class DashboardPanel {
           latest: outdatedMap.get(entry.name)?.latest ?? null,
           isUnused: !usedPackages.has(entry.name),
           isDev: entry.isDev,
+          lastUpdated: lastUpdatedMap.get(entry.name) ?? null,
         })),
       };
     } catch (err) {

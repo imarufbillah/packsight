@@ -2,9 +2,10 @@
 export interface DashboardPackage {
   name: string;
   version: string;
-  latest: string | null;   // null = up to date
+  latest: string | null;       // null = up to date
   isUnused: boolean;
   isDev: boolean;
+  lastUpdated: string | null;  // ISO date string of the installed version's publish time
 }
 
 /** Full payload sent to the webview on every data load/refresh */
