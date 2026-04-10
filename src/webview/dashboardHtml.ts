@@ -534,6 +534,21 @@ export function getDashboardHtml(
       color: var(--accent-blue);
       border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent);
     }
+    .badge-up-major {
+      background: color-mix(in srgb, var(--accent-red) 14%, transparent);
+      color: var(--accent-red);
+      border: 1px solid color-mix(in srgb, var(--accent-red) 30%, transparent);
+    }
+    .badge-up-minor {
+      background: color-mix(in srgb, var(--accent-blue) 14%, transparent);
+      color: var(--accent-blue);
+      border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent);
+    }
+    .badge-up-patch {
+      background: color-mix(in srgb, var(--accent-green) 14%, transparent);
+      color: var(--accent-green);
+      border: 1px solid color-mix(in srgb, var(--accent-green) 30%, transparent);
+    }
     .badge-crit {
       background: color-mix(in srgb, var(--accent-red) 14%, transparent);
       color: var(--accent-red);
@@ -817,15 +832,39 @@ export function getDashboardHtml(
     const ICON_OK   = '<svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 1 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" fill="currentColor"/></svg>';
     const ICON_CRIT = '<svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 3a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4A.5.5 0 0 1 8 5zm0 6.5a.6.6 0 1 1 0 1.2.6.6 0 0 1 0-1.2z" fill="currentColor"/></svg>';
 
+    function semverParts(v) {
+      const m = String(v).replace(/^[\^~>=<\s]+/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
+      return m ? [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])] : [0, 0, 0];
+    }
+
+    function bumpType(current, latest) {
+      if (!current || !latest) return null;
+      const [cMaj, cMin] = semverParts(current);
+      const [lMaj, lMin] = semverParts(latest);
+      if (lMaj > cMaj) return 'major';
+      if (lMin > cMin) return 'minor';
+      return 'patch';
+    }
+
+    // bump type → { label, badge class suffix }
+    const BUMP_META = {
+      major: { label: 'Major',  cls: 'badge-up-major' },
+      minor: { label: 'Minor',  cls: 'badge-up-minor' },
+      patch: { label: 'Patch',  cls: 'badge-up-patch' },
+    };
+
     function statusBadge(pkg) {
       const outdated = pkg.latest !== null;
       if (pkg.isUnused && outdated)
         return '<span class="badge badge-crit">' + ICON_CRIT + ' Unused + Outdated</span>';
       if (pkg.isUnused)
         return '<span class="badge badge-warn">' + ICON_WARN + ' Unused</span>';
-      if (outdated)
-        return '<span class="badge badge-up">'   + ICON_UP   + ' Update Available</span>';
-      return   '<span class="badge badge-ok">'   + ICON_OK   + ' OK</span>';
+      if (outdated) {
+        const bump = bumpType(pkg.version, pkg.latest);
+        const meta = BUMP_META[bump] || { label: 'Update', cls: 'badge-up' };
+        return '<span class="badge ' + meta.cls + '">' + ICON_UP + ' ' + meta.label + ' Update</span>';
+      }
+      return '<span class="badge badge-ok">' + ICON_OK + ' OK</span>';
     }
 
     // ── Date formatting ────────────────────────────────────────────────────
