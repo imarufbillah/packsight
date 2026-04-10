@@ -6,6 +6,7 @@ export interface DashboardPackage {
   isUnused: boolean;
   isDev: boolean;
   lastUpdated: string | null;  // ISO date string of the installed version's publish time
+  size: number | null;         // unpacked size in bytes
 }
 
 /** Full payload sent to the webview on every data load/refresh */

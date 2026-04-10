@@ -201,6 +201,44 @@ export async function getPackagesLastUpdated(
   return result;
 }
 
+/**
+ * Fetches the unpacked size (bytes) for each package's installed version
+ * using `npm view <pkg>@<version> dist.unpackedSize --json`.
+ */
+export async function getPackageSizes(
+  packages: Array<{ name: string; version: string }>
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  const concurrency = 8;
+  let idx = 0;
+
+  async function worker(): Promise<void> {
+    while (idx < packages.length) {
+      const pkg = packages[idx++];
+      const clean = pkg.version.replace(/^[\^~>=<\s]+/, '');
+      await new Promise<void>((resolve) => {
+        cp.exec(
+          `npm view ${pkg.name}@${clean} dist.unpackedSize --json`,
+          { timeout: 10000 },
+          (error, stdout) => {
+            if (!error && stdout.trim()) {
+              try {
+                const v = JSON.parse(stdout.trim());
+                if (typeof v === 'number' && v > 0) result.set(pkg.name, v);
+              } catch { /* skip */ }
+            }
+            resolve();
+          }
+        );
+      });
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, packages.length) }, worker);
+  await Promise.all(workers);
+  return result;
+}
+
 interface ExecError {
   stdout: string;
   stderr: string;

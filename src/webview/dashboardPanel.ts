@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { parseDependencies } from "../services/dependencyService";
-import { getOutdatedPackages, getPackagesLastUpdated } from "../services/npmService";
+import { getOutdatedPackages, getPackagesLastUpdated, getPackageSizes } from "../services/npmService";
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
@@ -141,10 +141,11 @@ export class DashboardPanel {
         ...devDependencies.map((p) => ({ ...p, isDev: true })),
       ];
 
-      // Fetch outdated and last-updated in parallel
-      const [outdatedMap, lastUpdatedMap] = await Promise.all([
+      // Fetch outdated, last-updated, and sizes in parallel
+      const [outdatedMap, lastUpdatedMap, sizeMap] = await Promise.all([
         getOutdatedPackages(allEntries),
         getPackagesLastUpdated(allEntries),
+        getPackageSizes(allEntries),
       ]);
 
       data = {
@@ -156,6 +157,7 @@ export class DashboardPanel {
           isUnused: !usedPackages.has(entry.name),
           isDev: entry.isDev,
           lastUpdated: lastUpdatedMap.get(entry.name) ?? null,
+          size: sizeMap.get(entry.name) ?? null,
         })),
       };
     } catch (err) {

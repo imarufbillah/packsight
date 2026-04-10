@@ -460,6 +460,12 @@ export function getDashboardHtml(
       color: var(--vscode-descriptionForeground);
       white-space: nowrap;
     }
+    td.col-size {
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-size: 0.82em;
+      color: var(--vscode-descriptionForeground);
+      white-space: nowrap;
+    }
 
     .actions-cell { display: flex; gap: 6px; flex-wrap: nowrap; }
     .actions-cell button { padding: 4px 11px; font-size: 0.79em; white-space: nowrap; }
@@ -766,13 +772,14 @@ export function getDashboardHtml(
           <th data-sort="version">Version <span class="sort-icon">↕</span></th>
           <th data-sort="latest">Latest <span class="sort-icon">↕</span></th>
           <th data-sort="lastUpdated">Last Update <span class="sort-icon">↕</span></th>
+          <th data-sort="size">Size <span class="sort-icon">↕</span></th>
           <th data-sort="status">Status <span class="sort-icon">↕</span></th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody id="pkg-tbody">
         <tr>
-          <td colspan="7">
+          <td colspan="8">
             <div class="empty-state">
               <div class="empty-state-icon">
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 2.5a.5.5 0 0 1 .5.5v3.25l2.25 1.3a.5.5 0 0 1-.5.866L7.75 9.6A.5.5 0 0 1 7.5 9.5V4a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
@@ -902,8 +909,7 @@ export function getDashboardHtml(
     }
 
     // ── Date formatting ────────────────────────────────────────────────────
-    function formatDate(iso) {
-      if (!iso) return '<span class="latest-dash">—</span>';
+    function formatDate(iso) {      if (!iso) return '<span class="latest-dash">—</span>';
       const d = new Date(iso);
       if (isNaN(d.getTime())) return '<span class="latest-dash">—</span>';
       const now  = Date.now();
@@ -914,6 +920,13 @@ export function getDashboardHtml(
       if (days < 30)  return days + 'd ago';
       if (days < 365) return Math.floor(days / 30) + 'mo ago';
       return Math.floor(days / 365) + 'y ago';
+    }
+
+    function formatSize(bytes) {
+      if (bytes === null || bytes === undefined) return '<span class="latest-dash">—</span>';
+      if (bytes < 1024)        return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     }
 
     // ── Sort ───────────────────────────────────────────────────────────────
@@ -944,7 +957,8 @@ export function getDashboardHtml(
             cmp = ta - tb;
             break;
           }
-          case 'status':  cmp = statusRank(a) - statusRank(b); break;
+          case 'size':        cmp = (a.size ?? 0) - (b.size ?? 0); break;
+          case 'status':      cmp = statusRank(a) - statusRank(b); break;
         }
         return sortDir === 'asc' ? cmp : -cmp;
       });
@@ -1015,7 +1029,7 @@ export function getDashboardHtml(
         }
 
         tbody.innerHTML =
-          '<tr><td colspan="7"><div class="empty-state">' +
+          '<tr><td colspan="8"><div class="empty-state">' +
           '<div class="empty-state-icon">' + icon + '</div>' +
           '<div class="empty-state-msg">' + esc(msg) + '</div>' +
           '</div></td></tr>';
@@ -1042,6 +1056,7 @@ export function getDashboardHtml(
           <td class="col-version">\${esc(pkg.version)}</td>
           <td class="col-latest">\${latestCell}</td>
           <td class="col-date">\${formatDate(pkg.lastUpdated)}</td>
+          <td class="col-size">\${formatSize(pkg.size)}</td>
           <td>\${statusBadge(pkg)}</td>
           <td class="actions-cell">
             \${updateBtn}
