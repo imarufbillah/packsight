@@ -53,7 +53,6 @@ export async function handleWebviewMessage(
       const { packageName } = message;
       post({ command: 'operationStart', packageName });
       try {
-        // Read user-configurable flags (default: --legacy-peer-deps)
         const flags = vscode.workspace
           .getConfiguration('packSight')
           .get<string>('updateFlags', '--legacy-peer-deps')
@@ -66,6 +65,33 @@ export async function handleWebviewMessage(
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         post({ command: 'operationError', message: `Could not update ${packageName} — ${detail}` });
       }
+      break;
+    }
+
+    case 'bulkUpdate': {
+      const { packageNames } = message;
+      const flags = vscode.workspace
+        .getConfiguration('packSight')
+        .get<string>('updateFlags', '--legacy-peer-deps')
+        .trim();
+      const flagStr = flags.length > 0 ? ` ${flags}` : '';
+      let failed = 0;
+
+      for (const packageName of packageNames) {
+        post({ command: 'operationStart', packageName });
+        try {
+          await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
+        } catch {
+          failed++;
+        }
+      }
+
+      if (failed === 0) {
+        post({ command: 'operationSuccess', message: `Updated ${packageNames.length} package(s) successfully` });
+      } else {
+        post({ command: 'operationError', message: `${packageNames.length - failed} updated, ${failed} failed` });
+      }
+      await onRefresh();
       break;
     }
   }

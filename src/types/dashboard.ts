@@ -21,6 +21,7 @@ export type WebviewMessage =
   | { command: 'ready' }
   | { command: 'uninstall'; packageName: string; isDev: boolean }
   | { command: 'update'; packageName: string }
+  | { command: 'bulkUpdate'; packageNames: string[] }
   | { command: 'refresh' };
 
 // ─── Messages: Extension → Webview ───────────────────────────────────────────

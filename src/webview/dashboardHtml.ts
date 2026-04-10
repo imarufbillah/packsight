@@ -464,6 +464,31 @@ export function getDashboardHtml(
     .actions-cell { display: flex; gap: 6px; flex-wrap: nowrap; }
     .actions-cell button { padding: 4px 11px; font-size: 0.79em; white-space: nowrap; }
 
+    /* ── Checkbox column ─────────────────────────────────────────────────── */
+    .col-check { width: 36px; padding-left: 14px !important; }
+    .col-check input[type="checkbox"] {
+      width: 15px; height: 15px;
+      cursor: pointer;
+      accent-color: var(--accent-blue);
+    }
+
+    /* ── Bulk action bar ─────────────────────────────────────────────────── */
+    #bulk-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 16px;
+      margin-top: 12px;
+      background: color-mix(in srgb, var(--accent-blue) 10%, var(--vscode-editorWidget-background));
+      border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent);
+      border-radius: var(--radius-md);
+      font-size: 0.85em;
+      animation: fadeUp 0.15s ease both;
+    }
+    #bulk-bar.visible { display: flex; }
+    #bulk-bar-label { color: var(--vscode-foreground); font-weight: 600; flex: 1; }
+    #bulk-bar-label span { color: var(--accent-blue); }
+
     /* ── Confirm modal ───────────────────────────────────────────────────── */
     #confirm-backdrop {
       display: none;
@@ -724,11 +749,19 @@ export function getDashboardHtml(
     </div>
   </div>
 
+  <!-- Bulk action bar -->
+  <div id="bulk-bar" role="toolbar" aria-label="Bulk actions">
+    <span id="bulk-bar-label"><span id="bulk-count">0</span> package(s) selected</span>
+    <button class="btn-primary" id="btn-bulk-update">↑ Update Selected</button>
+    <button class="btn-secondary" id="btn-bulk-clear">✕ Clear</button>
+  </div>
+
   <!-- Package table -->
   <div class="table-wrap">
     <table aria-label="Package list">
       <thead>
         <tr>
+          <th class="col-check"><input type="checkbox" id="select-all" title="Select all updatable packages" /></th>
           <th data-sort="name">Name <span class="sort-icon">↕</span></th>
           <th data-sort="version">Version <span class="sort-icon">↕</span></th>
           <th data-sort="latest">Latest <span class="sort-icon">↕</span></th>
@@ -739,7 +772,7 @@ export function getDashboardHtml(
       </thead>
       <tbody id="pkg-tbody">
         <tr>
-          <td colspan="6">
+          <td colspan="7">
             <div class="empty-state">
               <div class="empty-state-icon">
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 2.5a.5.5 0 0 1 .5.5v3.25l2.25 1.3a.5.5 0 0 1-.5.866L7.75 9.6A.5.5 0 0 1 7.5 9.5V4a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
@@ -772,8 +805,9 @@ export function getDashboardHtml(
     let activeTab   = 'all';
     let searchQuery = '';
     let isLoading   = false;
-    let sortKey     = 'name';   // 'name' | 'version' | 'latest' | 'status'
-    let sortDir     = 'asc';    // 'asc' | 'desc'
+    let sortKey     = 'name';
+    let sortDir     = 'asc';
+    let selectedPackages = new Set(); // package names selected for bulk update
 
     // ── Count-up animation ─────────────────────────────────────────────────
     function animateCount(el, target) {
@@ -939,6 +973,22 @@ export function getDashboardHtml(
       });
     }
 
+    // ── Bulk bar ───────────────────────────────────────────────────────────
+    function updateBulkBar() {
+      const count = selectedPackages.size;
+      const bar   = document.getElementById('bulk-bar');
+      document.getElementById('bulk-count').textContent = count;
+      bar.classList.toggle('visible', count > 0);
+
+      // Sync select-all checkbox state
+      const updatable = allPackages.filter(p => p.latest !== null);
+      const selectAll = document.getElementById('select-all');
+      if (selectAll) {
+        selectAll.indeterminate = count > 0 && count < updatable.length;
+        selectAll.checked = updatable.length > 0 && count === updatable.length;
+      }
+    }
+
     // ── Table render ───────────────────────────────────────────────────────
     function renderTable() {
       const tbody = document.getElementById('pkg-tbody');
@@ -965,15 +1015,14 @@ export function getDashboardHtml(
         }
 
         tbody.innerHTML =
-          '<tr><td colspan="6"><div class="empty-state">' +
+          '<tr><td colspan="7"><div class="empty-state">' +
           '<div class="empty-state-icon">' + icon + '</div>' +
           '<div class="empty-state-msg">' + esc(msg) + '</div>' +
           '</div></td></tr>';
         return;
       }
 
-      tbody.innerHTML = pkgs.map(pkg => {
-        const latestCell = pkg.latest
+      tbody.innerHTML = pkgs.map(pkg => {        const latestCell = pkg.latest
           ? '<span style="color:var(--vscode-charts-green,#4caf50)">' + esc(pkg.latest) + '</span>'
           : '<span class="latest-dash">—</span>';
 
@@ -986,6 +1035,9 @@ export function getDashboardHtml(
           : '';
 
         return \`<tr>
+          <td class="col-check">\${pkg.latest !== null
+            ? \`<input type="checkbox" class="row-check" data-name="\${esc(pkg.name)}" \${selectedPackages.has(pkg.name) ? 'checked' : ''} title="Select for bulk update" />\`
+            : ''}</td>
           <td class="col-name">\${esc(pkg.name)}\${devTag}</td>
           <td class="col-version">\${esc(pkg.version)}</td>
           <td class="col-latest">\${latestCell}</td>
@@ -1000,6 +1052,7 @@ export function getDashboardHtml(
           </td>
         </tr>\`;
       }).join('');
+      updateBulkBar();
     }
 
     // ── Toast ──────────────────────────────────────────────────────────────
@@ -1080,6 +1133,49 @@ export function getDashboardHtml(
         activeTab = tab.dataset.tab;
         renderTable();
       });
+    });
+
+    // ── Select-all checkbox ────────────────────────────────────────────────
+    document.getElementById('select-all').addEventListener('change', e => {
+      const checked = e.target.checked;
+      allPackages.filter(p => p.latest !== null).forEach(p => {
+        if (checked) selectedPackages.add(p.name);
+        else         selectedPackages.delete(p.name);
+      });
+      renderTable();
+    });
+
+    // Row checkbox delegation
+    document.getElementById('pkg-tbody').addEventListener('change', e => {
+      const target = e.target;
+      if (!target.classList.contains('row-check')) return;
+      const name = target.dataset.name;
+      if (target.checked) selectedPackages.add(name);
+      else                selectedPackages.delete(name);
+      updateBulkBar();
+    });
+
+    // Bulk update button
+    document.getElementById('btn-bulk-update').addEventListener('click', () => {
+      const names = [...selectedPackages];
+      if (names.length === 0) return;
+      showConfirm(
+        'Update Selected Packages',
+        'Update ' + names.length + ' package(s) to their latest versions?',
+        'Update All',
+        'btn-primary',
+        () => {
+          selectedPackages.clear();
+          updateBulkBar();
+          vscode.postMessage({ command: 'bulkUpdate', packageNames: names });
+        }
+      );
+    });
+
+    // Clear selection
+    document.getElementById('btn-bulk-clear').addEventListener('click', () => {
+      selectedPackages.clear();
+      renderTable();
     });
 
     // ── Sort header clicks ─────────────────────────────────────────────────
