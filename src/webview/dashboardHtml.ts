@@ -388,10 +388,32 @@ export function getDashboardHtml(
       font-size: 0.78em;
       text-transform: uppercase;
       letter-spacing: 0.07em;
+      user-select: none;
     }
     thead th:first-child { border-radius: var(--radius-lg) 0 0 0; }
     thead th:last-child  { border-radius: 0 var(--radius-lg) 0 0; }
-
+    thead th[data-sort] {
+      cursor: pointer;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+    thead th[data-sort]:hover {
+      color: var(--vscode-foreground);
+      background: color-mix(in srgb, var(--vscode-foreground) 5%, var(--vscode-editorWidget-background));
+    }
+    thead th[data-sort].sort-asc,
+    thead th[data-sort].sort-desc {
+      color: var(--accent-blue);
+    }
+    .sort-icon {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 0.85em;
+      opacity: 0.35;
+      transition: opacity var(--transition-fast);
+    }
+    th[data-sort]:hover .sort-icon { opacity: 0.7; }
+    th[data-sort].sort-asc  .sort-icon,
+    th[data-sort].sort-desc .sort-icon { opacity: 1; }
     tbody tr {
       border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
       transition: background var(--transition-fast);
@@ -686,10 +708,10 @@ export function getDashboardHtml(
     <table aria-label="Package list">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Version</th>
-          <th>Latest</th>
-          <th>Status</th>
+          <th data-sort="name">Name <span class="sort-icon">↕</span></th>
+          <th data-sort="version">Version <span class="sort-icon">↕</span></th>
+          <th data-sort="latest">Latest <span class="sort-icon">↕</span></th>
+          <th data-sort="status">Status <span class="sort-icon">↕</span></th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -728,6 +750,8 @@ export function getDashboardHtml(
     let activeTab   = 'all';
     let searchQuery = '';
     let isLoading   = false;
+    let sortKey     = 'name';   // 'name' | 'version' | 'latest' | 'status'
+    let sortDir     = 'asc';    // 'asc' | 'desc'
 
     // ── Count-up animation ─────────────────────────────────────────────────
     function animateCount(el, target) {
@@ -797,6 +821,45 @@ export function getDashboardHtml(
       return   '<span class="badge badge-ok">'   + ICON_OK   + ' OK</span>';
     }
 
+    // ── Sort ───────────────────────────────────────────────────────────────
+    function statusRank(pkg) {
+      // crit=0, warn=1, up=2, ok=3 — so ascending puts worst first
+      if (pkg.isUnused && pkg.latest !== null) return 0;
+      if (pkg.isUnused)                        return 1;
+      if (pkg.latest !== null)                 return 2;
+      return 3;
+    }
+
+    function sortedPackages(pkgs) {
+      return [...pkgs].sort((a, b) => {
+        let cmp = 0;
+        switch (sortKey) {
+          case 'name':    cmp = a.name.localeCompare(b.name); break;
+          case 'version': cmp = a.version.localeCompare(b.version, undefined, { numeric: true }); break;
+          case 'latest':
+            // null (up-to-date) sorts after packages that have an update
+            if (a.latest === b.latest) { cmp = 0; break; }
+            if (a.latest === null)     { cmp = 1; break; }
+            if (b.latest === null)     { cmp = -1; break; }
+            cmp = a.latest.localeCompare(b.latest, undefined, { numeric: true });
+            break;
+          case 'status':  cmp = statusRank(a) - statusRank(b); break;
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    function updateSortHeaders() {
+      document.querySelectorAll('thead th[data-sort]').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        th.querySelector('.sort-icon').textContent = '↕';
+        if (th.dataset.sort === sortKey) {
+          th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+          th.querySelector('.sort-icon').textContent = sortDir === 'asc' ? '↑' : '↓';
+        }
+      });
+    }
+
     // ── Filtering ──────────────────────────────────────────────────────────
     function filteredPackages() {
       return allPackages.filter(pkg => {
@@ -812,7 +875,7 @@ export function getDashboardHtml(
     // ── Table render ───────────────────────────────────────────────────────
     function renderTable() {
       const tbody = document.getElementById('pkg-tbody');
-      const pkgs  = filteredPackages();
+      const pkgs  = sortedPackages(filteredPackages());
 
       if (pkgs.length === 0) {
         let icon = '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M11.5 1a.5.5 0 0 1 .5.5v1h1.5a.5.5 0 0 1 0 1H13v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3.5H2.5a.5.5 0 0 1 0-1H4v-1a.5.5 0 0 1 1 0v1h6v-1a.5.5 0 0 1 .5-.5zM5.5 6a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5zm5 0a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5zm-2.5 0a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5z" fill="currentColor"/></svg>';
@@ -947,6 +1010,21 @@ export function getDashboardHtml(
         tab.classList.add('active');
         tab.setAttribute('aria-selected', 'true');
         activeTab = tab.dataset.tab;
+        renderTable();
+      });
+    });
+
+    // ── Sort header clicks ─────────────────────────────────────────────────
+    document.querySelectorAll('thead th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortKey = key;
+          sortDir = 'asc';
+        }
+        updateSortHeaders();
         renderTable();
       });
     });
