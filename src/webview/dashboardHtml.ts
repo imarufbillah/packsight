@@ -24,6 +24,9 @@ export function getDashboardHtml(
   const logoUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, "resources", "icon.svg"),
   );
+  const codiconCssUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "node_modules", "@vscode", "codicons", "dist", "codicon.css"),
+  );
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -33,9 +36,11 @@ export function getDashboardHtml(
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none';
              img-src ${cspSource};
+             font-src ${cspSource};
              style-src ${cspSource} 'unsafe-inline';
              script-src 'nonce-${nonce}';" />
   <title>Package Manager</title>
+  <link rel="stylesheet" href="${codiconCssUri}" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap');
 
@@ -680,30 +685,40 @@ export function getDashboardHtml(
       color: var(--vscode-foreground);
     }
     #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
-    /* ── Changelog icon button (hidden until row hover) ─────────────────── */
+    /* ── Changelog column (no header, right of Actions) ─────────────────── */
+    .col-changelog {
+      width: 36px;
+      padding: 0 8px !important;
+      text-align: center;
+    }
     .btn-changelog {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       padding: 0;
       background: transparent;
       color: var(--vscode-descriptionForeground);
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
+      font-size: 16px;
       opacity: 0;
-      transition: opacity var(--transition-fast), background var(--transition-fast),
-                  color var(--transition-fast), border-color var(--transition-fast);
-      position: relative;
+      visibility: hidden;
+      transition: opacity var(--transition-fast), visibility var(--transition-fast),
+                  background var(--transition-fast), color var(--transition-fast),
+                  border-color var(--transition-fast);
+      cursor: pointer;
     }
-    tr:hover .btn-changelog { opacity: 1; }
+    tr:hover .btn-changelog {
+      opacity: 1;
+      visibility: visible;
+    }
     .btn-changelog:hover {
       background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
       color: var(--accent-blue);
       border-color: color-mix(in srgb, var(--accent-blue) 28%, transparent);
     }
-    /* Native tooltip via title is enough; no extra CSS needed */
   </style>
 </head>
 <body>
@@ -799,11 +814,12 @@ export function getDashboardHtml(
           <th data-sort="size">Size <span class="sort-icon">↕</span></th>
           <th data-sort="status">Status <span class="sort-icon">↕</span></th>
           <th>Actions</th>
+          <th class="col-changelog"></th>
         </tr>
       </thead>
       <tbody id="pkg-tbody">
         <tr>
-          <td colspan="8">
+          <td colspan="9">
             <div class="empty-state">
               <div class="empty-state-icon">
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 2.5a.5.5 0 0 1 .5.5v3.25l2.25 1.3a.5.5 0 0 1-.5.866L7.75 9.6A.5.5 0 0 1 7.5 9.5V4a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
@@ -1053,7 +1069,7 @@ export function getDashboardHtml(
         }
 
         tbody.innerHTML =
-          '<tr><td colspan="8"><div class="empty-state">' +
+          '<tr><td colspan="9"><div class="empty-state">' +
           '<div class="empty-state-icon">' + icon + '</div>' +
           '<div class="empty-state-msg">' + esc(msg) + '</div>' +
           '</div></td></tr>';
@@ -1084,14 +1100,14 @@ export function getDashboardHtml(
           <td>\${statusBadge(pkg)}</td>
           <td class="actions-cell">
             \${updateBtn}
-            \${pkg.repoUrl
-              ? \`<button class="btn-changelog" data-url="\${esc(pkg.repoUrl)}" title="View releases on GitHub" aria-label="View releases for \${esc(pkg.name)} on GitHub"><svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M3 1.5A1.5 1.5 0 0 1 4.5 0h7A1.5 1.5 0 0 1 13 1.5v13a.5.5 0 0 1-.724.447L8 12.82l-4.276 2.127A.5.5 0 0 1 3 14.5v-13zm1.5-.5a.5.5 0 0 0-.5.5V13.58l3.776-1.878a.5.5 0 0 1 .448 0L12 13.58V1.5a.5.5 0 0 0-.5-.5h-7z" fill="currentColor"/></svg></button>\`
-              : ''}
             <button class="btn-danger btn-uninstall"
               data-name="\${esc(pkg.name)}"
               data-dev="\${pkg.isDev}"
               title="Uninstall \${esc(pkg.name)}">Uninstall</button>
           </td>
+          <td class="col-changelog">\${pkg.repoUrl
+            ? \`<button class="btn-changelog codicon codicon-book" data-url="\${esc(pkg.repoUrl)}" title="View releases on GitHub" aria-label="View releases for \${esc(pkg.name)} on GitHub"></button>\`
+            : ''}</td>
         </tr>\`;
       }).join('');
       updateBulkBar();

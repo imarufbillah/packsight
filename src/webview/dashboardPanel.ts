@@ -84,7 +84,10 @@ export class DashboardPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [context.extensionUri],
+        localResourceRoots: [
+          context.extensionUri,
+          vscode.Uri.joinPath(context.extensionUri, "node_modules"),
+        ],
       },
     );
 
