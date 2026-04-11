@@ -1629,7 +1629,13 @@ export function getDashboardHtml(
 
     document.getElementById('browse-search-btn').addEventListener('click', doSearch);
     document.getElementById('browse-search-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doSearch();
+      if (e.key === 'Enter') { clearTimeout(browseSearchTimer); doSearch(); }
+    });
+    document.getElementById('browse-search-input').addEventListener('input', () => {
+      clearTimeout(browseSearchTimer);
+      const q = document.getElementById('browse-search-input').value.trim();
+      if (!q) return;
+      browseSearchTimer = setTimeout(doSearch, 400);
     });
 
     // Install button delegation
@@ -1642,10 +1648,10 @@ export function getDashboardHtml(
         vscode.postMessage({ command: 'installPackage', packageName, isDev });
         return;
       }
-      // Package name click → open on npmjs
+      // Package name click → open on npmjs via extension (window.open is sandboxed)
       const nameSpan = e.target.closest('.browse-result-name');
       if (nameSpan) {
-        window.open('https://www.npmjs.com/package/' + encodeURIComponent(nameSpan.dataset.name), '_blank');
+        vscode.postMessage({ command: 'openNpm', packageName: nameSpan.dataset.name });
       }
     });
 
