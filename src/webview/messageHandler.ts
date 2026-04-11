@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { runCommand } from '../services/npmService';
+import { runCommand, searchNpmPackages } from '../services/npmService';
 import { ExtensionMessage, WebviewMessage } from '../types/dashboard';
 
 /**
@@ -109,6 +109,36 @@ export async function handleWebviewMessage(
         'vscode.open',
         vscode.Uri.parse(`https://www.npmjs.com/package/${encodeURIComponent(packageName)}`)
       );
+      break;
+    }
+
+    case 'searchPackages': {
+      const { query } = message;
+      try {
+        const results = await searchNpmPackages(query);
+        post({ command: 'searchResults', results });
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
+        post({ command: 'searchError', message: detail });
+      }
+      break;
+    }
+
+    case 'installPackage': {
+      const { packageName, isDev } = message;
+      post({ command: 'operationStart', packageName });
+      try {
+        const cfg = vscode.workspace.getConfiguration('packSight');
+        const flags = cfg.get<string>('updateFlags', '--legacy-peer-deps').trim();
+        const flagStr = flags.length > 0 ? ` ${flags}` : '';
+        const saveFlag = isDev ? '--save-dev' : '--save';
+        await runCommand(`npm install ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
+        post({ command: 'operationSuccess', message: `Installed ${packageName}` });
+        await onRefresh();
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
+        post({ command: 'operationError', message: `Could not install ${packageName} — ${detail}` });
+      }
       break;
     }
   }

@@ -30,12 +30,24 @@ export type WebviewMessage =
   | { command: 'bulkUpdate'; packageNames: string[] }
   | { command: 'refresh' }
   | { command: 'openChangelog'; url: string }
-  | { command: 'openNpm'; packageName: string };
+  | { command: 'openNpm'; packageName: string }
+  | { command: 'searchPackages'; query: string }
+  | { command: 'installPackage'; packageName: string; isDev: boolean };
 
 // ─── Messages: Extension → Webview ───────────────────────────────────────────
+
+/** A single npm search result */
+export interface NpmSearchResult {
+  name: string;
+  version: string;
+  description: string;
+  weeklyDownloads: number | null;
+}
 
 export type ExtensionMessage =
   | { command: 'loadData'; payload: DashboardData }
   | { command: 'operationStart'; packageName: string }
   | { command: 'operationSuccess'; message: string }
-  | { command: 'operationError'; message: string };
+  | { command: 'operationError'; message: string }
+  | { command: 'searchResults'; results: NpmSearchResult[] }
+  | { command: 'searchError'; message: string };

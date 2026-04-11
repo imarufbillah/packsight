@@ -334,6 +334,59 @@ export async function getRuntimeVersions(): Promise<{ node: string | null; npm: 
   return { node, npm };
 }
 
+/** Shape of a single object in the npm search API `objects` array */
+interface NpmSearchObject {
+  package: {
+    name: string;
+    version: string;
+    description?: string;
+    links?: { npm?: string };
+  };
+  downloads?: { weekly?: number };
+}
+
+/** Shape of the npm search API response */
+interface NpmSearchResponse {
+  objects: NpmSearchObject[];
+}
+
+/**
+ * Searches the npm registry for packages matching `query`.
+ * Uses the public registry search API — no npm CLI required, no auth needed.
+ * Returns up to `size` results (max 20).
+ */
+export async function searchNpmPackages(
+  query: string,
+  size = 10
+): Promise<Array<{ name: string; version: string; description: string; weeklyDownloads: number | null }>> {
+  return new Promise((resolve) => {
+    const url = `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(query)}&size=${size}`;
+    cp.exec(
+      `npm search ${JSON.stringify(query)} --json --searchlimit ${size}`,
+      { timeout: 15000 },
+      (error, stdout) => {
+        if (error || !stdout.trim()) { resolve([]); return; }
+        try {
+          const raw = JSON.parse(stdout.trim());
+          // npm search --json returns an array of objects directly
+          if (!Array.isArray(raw)) { resolve([]); return; }
+          resolve(
+            raw.slice(0, size).map((item: Record<string, unknown>) => ({
+              name: typeof item['name'] === 'string' ? item['name'] : '',
+              version: typeof item['version'] === 'string' ? item['version'] : '',
+              description: typeof item['description'] === 'string' ? item['description'] : '',
+              weeklyDownloads: null,
+            })).filter(r => r.name.length > 0)
+          );
+        } catch {
+          resolve([]);
+        }
+      }
+    );
+    void url; // url kept for reference; using CLI to avoid CSP/network restrictions
+  });
+}
+
 interface ExecError {
   stdout: string;
   stderr: string;

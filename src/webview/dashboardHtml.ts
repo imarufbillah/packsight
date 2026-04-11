@@ -872,6 +872,178 @@ export function getDashboardHtml(
       opacity: 1;
       transform: scale(1);
     }
+
+    /* ── Browse & Install panel ──────────────────────────────────────────── */
+    #browse-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      z-index: 400;
+      align-items: flex-start;
+      justify-content: flex-end;
+    }
+    #browse-backdrop.visible { display: flex; }
+    #browse-panel {
+      width: 420px;
+      max-width: 95vw;
+      height: 100vh;
+      background: var(--vscode-editorWidget-background);
+      border-left: 1px solid color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.3);
+      animation: slideInRight 0.22s cubic-bezier(0.4,0,0.2,1) both;
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    .browse-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      flex-shrink: 0;
+    }
+    .browse-header h2 {
+      font-family: 'Syne', var(--vscode-font-family), sans-serif;
+      font-size: 1.05em;
+      font-weight: 700;
+      color: var(--vscode-foreground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #browse-close {
+      background: transparent;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+    #browse-close:hover {
+      color: var(--vscode-foreground);
+      background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+    }
+    .browse-search-wrap {
+      padding: 14px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
+      flex-shrink: 0;
+      display: flex;
+      gap: 8px;
+    }
+    #browse-search-input {
+      flex: 1;
+      padding: 9px 14px;
+      background: color-mix(in srgb, var(--vscode-input-background) 100%, transparent);
+      color: var(--vscode-input-foreground);
+      border: 1px solid color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 80%, transparent);
+      border-radius: var(--radius-md);
+      font-size: 0.93em;
+      font-family: var(--vscode-font-family);
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    #browse-search-input::placeholder { color: var(--vscode-input-placeholderForeground); opacity: 0.7; }
+    #browse-search-input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 18%, transparent);
+    }
+    #browse-search-btn {
+      padding: 9px 16px;
+      font-size: 0.88em;
+      flex-shrink: 0;
+    }
+    #browse-results {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .browse-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 48px 24px;
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.88em;
+      text-align: center;
+      height: 100%;
+    }
+    .browse-state svg { opacity: 0.35; }
+    .browse-result-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 40%, transparent);
+      transition: background var(--transition-fast);
+    }
+    .browse-result-item:last-child { border-bottom: none; }
+    .browse-result-item:hover {
+      background: color-mix(in srgb, var(--vscode-list-hoverBackground) 100%, transparent);
+    }
+    .browse-result-top {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .browse-result-name {
+      font-weight: 700;
+      font-size: 0.93em;
+      color: var(--accent-blue);
+      cursor: pointer;
+    }
+    .browse-result-name:hover { text-decoration: underline; }
+    .browse-result-version {
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-size: 0.78em;
+      color: var(--vscode-descriptionForeground);
+    }
+    .browse-result-installed {
+      font-size: 0.72em;
+      color: var(--accent-green);
+      background: color-mix(in srgb, var(--accent-green) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent-green) 28%, transparent);
+      border-radius: 20px;
+      padding: 1px 7px;
+      font-weight: 600;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+    .browse-result-desc {
+      font-size: 0.82em;
+      color: var(--vscode-descriptionForeground);
+      line-height: 1.45;
+      margin-bottom: 10px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .browse-result-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .browse-result-actions button {
+      font-size: 0.80em;
+      padding: 4px 12px;
+    }
+    .browse-spinner {
+      width: 28px; height: 28px;
+      border: 2.5px solid color-mix(in srgb, var(--vscode-panel-border) 80%, transparent);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.7s cubic-bezier(0.4,0,0.6,1) infinite;
+    }
   </style>
 </head>
 <body>
@@ -896,6 +1068,10 @@ export function getDashboardHtml(
     <div class="header-right">
       <div id="project-name"></div>
       <div class="header-actions">
+        <button class="btn-secondary" id="btn-browse">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1a.5.5 0 0 1 .5.5v1h1.5a.5.5 0 0 1 0 1H12v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 11.5V3.5h-.5a.5.5 0 0 1 0-1H3v-1a.5.5 0 0 1 1 0v1h7v-1a.5.5 0 0 1 .5-.5zM3 3.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8H3zm2 2a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm-2 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
+          Browse &amp; Install
+        </button>
         <button class="btn-secondary" id="btn-refresh" title="Refresh dependency data">↺ Refresh</button>
       </div>
     </div>
@@ -998,6 +1174,31 @@ export function getDashboardHtml(
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Browse & Install panel -->
+  <div id="browse-backdrop" role="dialog" aria-modal="true" aria-labelledby="browse-panel-title">
+    <div id="browse-panel">
+      <div class="browse-header">
+        <h2 id="browse-panel-title">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1a.5.5 0 0 1 .5.5v1h1.5a.5.5 0 0 1 0 1H12v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 11.5V3.5h-.5a.5.5 0 0 1 0-1H3v-1a.5.5 0 0 1 1 0v1h7v-1a.5.5 0 0 1 .5-.5zM3 3.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8H3zm2 2a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm-2 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
+          Browse &amp; Install
+        </h2>
+        <button id="browse-close" aria-label="Close browse panel">
+          <span class="codicon codicon-close"></span>
+        </button>
+      </div>
+      <div class="browse-search-wrap">
+        <input type="search" id="browse-search-input" placeholder="Search npm packages…" aria-label="Search npm packages" autocomplete="off" />
+        <button class="btn-primary" id="browse-search-btn">Search</button>
+      </div>
+      <div id="browse-results">
+        <div class="browse-state" id="browse-idle">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" fill="currentColor"/></svg>
+          <span>Search for any npm package to browse and install it into your project.</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Confirm modal -->
@@ -1349,6 +1550,108 @@ export function getDashboardHtml(
           setLoading(false);
           showToast(msg.message, 'error');
           break;
+
+        case 'searchResults':
+          renderBrowseResults(msg.results);
+          break;
+
+        case 'searchError':
+          renderBrowseError(msg.message);
+          break;
+      }
+    });
+
+    // ── Browse & Install panel ─────────────────────────────────────────────
+    let browseSearchTimer = null;
+
+    function openBrowsePanel() {
+      document.getElementById('browse-backdrop').classList.add('visible');
+      document.getElementById('browse-search-input').focus();
+    }
+
+    function closeBrowsePanel() {
+      document.getElementById('browse-backdrop').classList.remove('visible');
+    }
+
+    function setBrowseLoading() {
+      document.getElementById('browse-results').innerHTML =
+        '<div class="browse-state"><div class="browse-spinner"></div><span>Searching…</span></div>';
+    }
+
+    function renderBrowseResults(results) {
+      const container = document.getElementById('browse-results');
+      if (!results || results.length === 0) {
+        container.innerHTML =
+          '<div class="browse-state">' +
+          '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M8 1.5a.5.5 0 0 1 .44.26l6 10.5A.5.5 0 0 1 14 13H2a.5.5 0 0 1-.44-.74l6-10.5A.5.5 0 0 1 8 1.5zm0 1.06L2.87 12h10.26L8 2.56zM8 6a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3A.5.5 0 0 1 8 6zm0 5.5a.6.6 0 1 1 0 1.2.6.6 0 0 1 0-1.2z" fill="currentColor"/></svg>' +
+          '<span>No packages found. Try a different search term.</span></div>';
+        return;
+      }
+      const installedNames = new Set(allPackages.map(p => p.name));
+      container.innerHTML = results.map(r => {
+        const isInstalled = installedNames.has(r.name);
+        const installBtns = isInstalled
+          ? '<span class="browse-result-installed">✓ Installed</span>'
+          : '<button class="btn-primary browse-install-btn" data-name="' + esc(r.name) + '" data-dev="false">+ Install</button>' +
+            '<button class="btn-secondary browse-install-btn" data-name="' + esc(r.name) + '" data-dev="true">+ Dev</button>';
+        return '<div class="browse-result-item">' +
+          '<div class="browse-result-top">' +
+            '<span class="browse-result-name" data-name="' + esc(r.name) + '">' + esc(r.name) + '</span>' +
+            '<span class="browse-result-version">v' + esc(r.version) + '</span>' +
+            (isInstalled ? '<span class="browse-result-installed">✓ Installed</span>' : '') +
+          '</div>' +
+          '<div class="browse-result-desc">' + esc(r.description || 'No description available.') + '</div>' +
+          '<div class="browse-result-actions">' + (isInstalled ? '' : installBtns) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderBrowseError(msg) {
+      document.getElementById('browse-results').innerHTML =
+        '<div class="browse-state" style="color:var(--accent-red)">' +
+        '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 3a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4A.5.5 0 0 1 8 5zm0 6.5a.6.6 0 1 1 0 1.2.6.6 0 0 1 0-1.2z" fill="currentColor"/></svg>' +
+        '<span>' + esc(msg) + '</span></div>';
+    }
+
+    function doSearch() {
+      const q = document.getElementById('browse-search-input').value.trim();
+      if (!q) return;
+      setBrowseLoading();
+      vscode.postMessage({ command: 'searchPackages', query: q });
+    }
+
+    document.getElementById('btn-browse').addEventListener('click', openBrowsePanel);
+
+    document.getElementById('browse-close').addEventListener('click', closeBrowsePanel);
+    document.getElementById('browse-backdrop').addEventListener('click', e => {
+      if (e.target === document.getElementById('browse-backdrop')) closeBrowsePanel();
+    });
+
+    document.getElementById('browse-search-btn').addEventListener('click', doSearch);
+    document.getElementById('browse-search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    // Install button delegation
+    document.getElementById('browse-results').addEventListener('click', e => {
+      const btn = e.target.closest('.browse-install-btn');
+      if (btn) {
+        const packageName = btn.dataset.name;
+        const isDev = btn.dataset.dev === 'true';
+        closeBrowsePanel();
+        vscode.postMessage({ command: 'installPackage', packageName, isDev });
+        return;
+      }
+      // Package name click → open on npmjs
+      const nameSpan = e.target.closest('.browse-result-name');
+      if (nameSpan) {
+        window.open('https://www.npmjs.com/package/' + encodeURIComponent(nameSpan.dataset.name), '_blank');
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('browse-backdrop').classList.contains('visible')) {
+        closeBrowsePanel();
       }
     });
 
