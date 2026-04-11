@@ -687,12 +687,11 @@ export function getDashboardHtml(
     #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
     /* ── Changelog column (no header, right of Actions) ─────────────────── */
     .col-changelog {
-      width: 36px;
-      padding: 0 8px !important;
-      text-align: center;
+      // width: 40px;
+      padding: 0 6px 0 0 !important;
+      text-align: left;
     }
     .btn-changelog-wrap {
-      position: relative;
       display: inline-flex;
     }
     .btn-changelog {
@@ -723,13 +722,10 @@ export function getDashboardHtml(
       color: var(--accent-blue);
       border-color: color-mix(in srgb, var(--accent-blue) 28%, transparent);
     }
-    /* Custom tooltip */
-    .btn-changelog-wrap::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: calc(100% + 7px);
-      left: 50%;
-      transform: translateX(-50%) scale(0.92);
+    /* Custom tooltip — rendered via JS into a fixed-position singleton
+       so it escapes overflow:auto on .table-wrap */
+    #changelog-tooltip {
+      position: fixed;
       background: var(--vscode-editorWidget-background);
       color: var(--vscode-foreground);
       border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 80%, transparent);
@@ -738,14 +734,15 @@ export function getDashboardHtml(
       font-size: 0.76em;
       white-space: nowrap;
       pointer-events: none;
-      opacity: 0;
       box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+      opacity: 0;
+      transform: scale(0.92);
       transition: opacity 120ms ease, transform 120ms ease;
-      z-index: 50;
+      z-index: 9999;
     }
-    .btn-changelog-wrap:hover::after {
+    #changelog-tooltip.visible {
       opacity: 1;
-      transform: translateX(-50%) scale(1);
+      transform: scale(1);
     }
   </style>
 </head>
@@ -759,6 +756,9 @@ export function getDashboardHtml(
 
   <!-- Toast notification -->
   <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- Changelog tooltip (fixed-position singleton, avoids overflow clipping) -->
+  <div id="changelog-tooltip"></div>
 
   <!-- Header -->
   <div class="header">
@@ -1338,9 +1338,32 @@ export function getDashboardHtml(
     });
 
     // ── Changelog button delegation ────────────────────────────────────────
+    const clTooltip = document.getElementById('changelog-tooltip');
+
+    document.getElementById('pkg-tbody').addEventListener('mouseenter', e => {
+      const btn = e.target.closest('.btn-changelog');
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      clTooltip.textContent = btn.closest('.btn-changelog-wrap').dataset.tooltip;
+      // Position above the button, centred horizontally
+      clTooltip.style.left = (rect.left + rect.width / 2) + 'px';
+      clTooltip.style.top  = (rect.top - 8) + 'px';
+      clTooltip.style.transform = 'translateX(-50%) translateY(-100%) scale(0.92)';
+      // Force reflow so the transition fires from the initial state
+      clTooltip.getBoundingClientRect();
+      clTooltip.classList.add('visible');
+      clTooltip.style.transform = 'translateX(-50%) translateY(-100%) scale(1)';
+    }, true);
+
+    document.getElementById('pkg-tbody').addEventListener('mouseleave', e => {
+      if (!e.target.closest('.btn-changelog')) return;
+      clTooltip.classList.remove('visible');
+    }, true);
+
     document.getElementById('pkg-tbody').addEventListener('click', e => {
       const target = e.target.closest('.btn-changelog');
       if (!target) return;
+      clTooltip.classList.remove('visible');
       vscode.postMessage({ command: 'openChangelog', url: target.dataset.url });
     });
 
