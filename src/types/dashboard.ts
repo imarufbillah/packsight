@@ -15,6 +15,10 @@ export interface DashboardData {
   packages: DashboardPackage[];
   /** Absolute path shown in the header for context */
   workspaceRoot: string;
+  /** Node.js runtime version, e.g. "20.11.0" */
+  nodeVersion: string | null;
+  /** npm version, e.g. "10.2.4" */
+  npmVersion: string | null;
 }
 
 // ─── Messages: Webview → Extension ───────────────────────────────────────────

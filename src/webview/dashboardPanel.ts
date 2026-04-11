@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { parseDependencies } from "../services/dependencyService";
-import { getOutdatedPackages, getPackagesLastUpdated, getPackageSizes, getPackageRepoUrls } from "../services/npmService";
+import { getOutdatedPackages, getPackagesLastUpdated, getPackageSizes, getPackageRepoUrls, getRuntimeVersions } from "../services/npmService";
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
@@ -144,16 +144,19 @@ export class DashboardPanel {
         ...devDependencies.map((p) => ({ ...p, isDev: true })),
       ];
 
-      // Fetch outdated, last-updated, sizes, and repo URLs in parallel
-      const [outdatedMap, lastUpdatedMap, sizeMap, repoUrlMap] = await Promise.all([
+      // Fetch outdated, last-updated, sizes, repo URLs, and runtime versions in parallel
+      const [outdatedMap, lastUpdatedMap, sizeMap, repoUrlMap, runtimeVersions] = await Promise.all([
         getOutdatedPackages(allEntries),
         getPackagesLastUpdated(allEntries),
         getPackageSizes(allEntries),
         getPackageRepoUrls(allEntries),
+        getRuntimeVersions(),
       ]);
 
       data = {
         workspaceRoot: this.workspaceRoot,
+        nodeVersion: runtimeVersions.node,
+        npmVersion: runtimeVersions.npm,
         packages: allEntries.map((entry) => ({
           name: entry.name,
           version: entry.version,
@@ -166,7 +169,7 @@ export class DashboardPanel {
         })),
       };
     } catch (err) {
-      data = { workspaceRoot: this.workspaceRoot, packages: [] };
+      data = { workspaceRoot: this.workspaceRoot, packages: [], nodeVersion: null, npmVersion: null };
     }
 
     const msg: ExtensionMessage = { command: "loadData", payload: data };

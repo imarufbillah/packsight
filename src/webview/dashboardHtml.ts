@@ -310,6 +310,38 @@ export function getDashboardHtml(
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue) 18%, transparent);
     }
 
+    /* ── Runtime version badges ──────────────────────────────────────────── */
+    .runtime-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+    .runtime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-size: 0.76em;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .runtime-badge-node {
+      color: #4ade80;
+      background: color-mix(in srgb, #4ade80 10%, transparent);
+      border-color: color-mix(in srgb, #4ade80 25%, transparent);
+    }
+    .runtime-badge-npm {
+      color: #f87171;
+      background: color-mix(in srgb, #f87171 10%, transparent);
+      border-color: color-mix(in srgb, #f87171 25%, transparent);
+    }
+    .runtime-badge svg { flex-shrink: 0; }
+
     /* ── Tabs ────────────────────────────────────────────────────────────── */
     .tab-bar {
       display: flex;
@@ -808,10 +840,22 @@ export function getDashboardHtml(
     </div>
   </div>
 
-  <!-- Toolbar: search left, tabs right -->
+  <!-- Toolbar: search left, runtime badges centre, tabs right -->
   <div class="toolbar">
     <div class="search-wrap">
       <input type="search" id="search-input" placeholder="Search packages…" aria-label="Search packages" autocomplete="off" />
+    </div>
+    <div class="runtime-badges" id="runtime-badges" aria-label="Runtime versions">
+      <span class="runtime-badge runtime-badge-node" id="badge-node">
+        <!-- Node.js hex icon -->
+        <svg width="13" height="13" viewBox="0 0 256 289" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M128 0 L256 74v141L128 289 0 215V74z" fill="none"/><path d="M128 6.9 L6 78.5v133L128 283l122-71.5v-133zm0 21.7 100.3 58.6v117.6L128 263 27.7 204.8V87.2z" fill="currentColor" opacity=".3"/><path d="M128 28.6 L27.7 87.2v117.6L128 263l100.3-58.6V87.2zm-9.3 152.7v-19.6l-42.5-24.5v-39.3l42.5 24.5V83.2l9.3-5.4 9.3 5.4v39.2l42.5-24.5v39.3l-42.5 24.5v19.6l-9.3 5.4z" fill="currentColor"/></svg>
+        <span id="badge-node-ver">—</span>
+      </span>
+      <span class="runtime-badge runtime-badge-npm" id="badge-npm">
+        <!-- npm wordmark icon -->
+        <svg width="14" height="14" viewBox="0 0 780 250" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M240 250V0H0v250h240zm-160-40V90h80v120h-40V90h-40v120zM260 0v250h240V0H260zm200 210h-40V90h-40v120h-40V40h120v170zM520 0v250h240V0H520zm200 210h-40V90h-40v120h-40V90h-40v120h-40V40h160v170z"/></svg>
+        <span id="badge-npm-ver">—</span>
+      </span>
     </div>
     <div class="tab-bar" role="tablist" aria-label="Filter packages">
       <button class="tab active" role="tab" aria-selected="true"  data-tab="all">
@@ -1187,6 +1231,12 @@ export function getDashboardHtml(
           const parts = msg.payload.workspaceRoot.split('\\\\').join('/').split('/');
           const nameEl = document.getElementById('project-name');
           if (nameEl) nameEl.textContent = (parts[parts.length - 1] || '').toUpperCase();
+          // Runtime version badges
+          const nodeVer = msg.payload.nodeVersion;
+          const npmVer  = msg.payload.npmVersion;
+          document.getElementById('badge-node-ver').textContent = nodeVer ? 'v' + nodeVer : '—';
+          document.getElementById('badge-npm-ver').textContent  = npmVer  ? 'v' + npmVer  : '—';
+          document.getElementById('runtime-badges').style.display = (nodeVer || npmVer) ? 'flex' : 'none';
           updateStats();
           renderTable();
           setLoading(false);

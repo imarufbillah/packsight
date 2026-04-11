@@ -311,6 +311,29 @@ function normaliseToReleasesUrl(raw: string): string | null {
   }
 }
 
+/**
+ * Fetches the currently active Node.js and npm versions by running
+ * `node --version` and `npm --version` in the workspace.
+ * Returns null for either if the binary is not found or errors.
+ */
+export async function getRuntimeVersions(): Promise<{ node: string | null; npm: string | null }> {
+  const [node, npm] = await Promise.all([
+    new Promise<string | null>((resolve) => {
+      cp.exec('node --version', { timeout: 5000 }, (err, stdout) => {
+        if (err || !stdout.trim()) { resolve(null); return; }
+        resolve(stdout.trim().replace(/^v/, ''));
+      });
+    }),
+    new Promise<string | null>((resolve) => {
+      cp.exec('npm --version', { timeout: 5000 }, (err, stdout) => {
+        if (err || !stdout.trim()) { resolve(null); return; }
+        resolve(stdout.trim());
+      });
+    }),
+  ]);
+  return { node, npm };
+}
+
 interface ExecError {
   stdout: string;
   stderr: string;
