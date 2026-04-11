@@ -691,6 +691,10 @@ export function getDashboardHtml(
       padding: 0 8px !important;
       text-align: center;
     }
+    .btn-changelog-wrap {
+      position: relative;
+      display: inline-flex;
+    }
     .btn-changelog {
       display: inline-flex;
       align-items: center;
@@ -718,6 +722,30 @@ export function getDashboardHtml(
       background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
       color: var(--accent-blue);
       border-color: color-mix(in srgb, var(--accent-blue) 28%, transparent);
+    }
+    /* Custom tooltip */
+    .btn-changelog-wrap::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 7px);
+      left: 50%;
+      transform: translateX(-50%) scale(0.92);
+      background: var(--vscode-editorWidget-background);
+      color: var(--vscode-foreground);
+      border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 80%, transparent);
+      border-radius: var(--radius-sm);
+      padding: 5px 10px;
+      font-size: 0.76em;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+      transition: opacity 120ms ease, transform 120ms ease;
+      z-index: 50;
+    }
+    .btn-changelog-wrap:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
     }
   </style>
 </head>
@@ -1106,7 +1134,7 @@ export function getDashboardHtml(
               title="Uninstall \${esc(pkg.name)}">Uninstall</button>
           </td>
           <td class="col-changelog">\${pkg.repoUrl
-            ? \`<button class="btn-changelog codicon codicon-book" data-url="\${esc(pkg.repoUrl)}" title="View releases on GitHub" aria-label="View releases for \${esc(pkg.name)} on GitHub"></button>\`
+            ? \`<span class="btn-changelog-wrap" data-tooltip="View Releases on GitHub"><button class="btn-changelog codicon codicon-book" data-url="\${esc(pkg.repoUrl)}" aria-label="View releases for \${esc(pkg.name)} on GitHub"></button></span>\`
             : ''}</td>
         </tr>\`;
       }).join('');
