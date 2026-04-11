@@ -724,7 +724,7 @@ export function getDashboardHtml(
     }
     /* Custom tooltip — rendered via JS into a fixed-position singleton
        so it escapes overflow:auto on .table-wrap */
-    #changelog-tooltip {
+    #ps-tooltip {
       position: fixed;
       background: var(--vscode-editorWidget-background);
       color: var(--vscode-foreground);
@@ -740,7 +740,7 @@ export function getDashboardHtml(
       transition: opacity 120ms ease, transform 120ms ease;
       z-index: 9999;
     }
-    #changelog-tooltip.visible {
+    #ps-tooltip.visible {
       opacity: 1;
       transform: scale(1);
     }
@@ -758,7 +758,7 @@ export function getDashboardHtml(
   <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
   <!-- Changelog tooltip (fixed-position singleton, avoids overflow clipping) -->
-  <div id="changelog-tooltip"></div>
+  <div id="ps-tooltip"></div>
 
   <!-- Header -->
   <div class="header">
@@ -1123,7 +1123,7 @@ export function getDashboardHtml(
           <td class="col-name">\${esc(pkg.name)}\${devTag}</td>
           <td class="col-version">\${esc(pkg.version)}</td>
           <td class="col-latest">\${latestCell}</td>
-          <td class="col-date">\${formatDate(pkg.lastUpdated)}</td>
+          <td class="col-date" data-iso="\${pkg.lastUpdated ? esc(pkg.lastUpdated) : ''}">\${formatDate(pkg.lastUpdated)}</td>
           <td class="col-size">\${formatSize(pkg.size)}</td>
           <td>\${statusBadge(pkg)}</td>
           <td class="actions-cell">
@@ -1337,33 +1337,58 @@ export function getDashboardHtml(
       }
     });
 
-    // ── Changelog button delegation ────────────────────────────────────────
-    const clTooltip = document.getElementById('changelog-tooltip');
+    // ── Shared fixed-position tooltip ──────────────────────────────────────
+    const psTooltip = document.getElementById('ps-tooltip');
 
+    function showTooltip(text, anchorRect, alignCenter) {
+      psTooltip.textContent = text;
+      if (alignCenter) {
+        psTooltip.style.left = (anchorRect.left + anchorRect.width / 2) + 'px';
+        psTooltip.style.transform = 'translateX(-50%) translateY(-100%) scale(0.92)';
+      } else {
+        psTooltip.style.left = anchorRect.left + 'px';
+        psTooltip.style.transform = 'translateY(-100%) scale(0.92)';
+      }
+      psTooltip.style.top = (anchorRect.top - 8) + 'px';
+      psTooltip.getBoundingClientRect(); // force reflow so transition fires
+      psTooltip.classList.add('visible');
+      psTooltip.style.transform = psTooltip.style.transform.replace('0.92', '1');
+    }
+
+    function hideTooltip() {
+      psTooltip.classList.remove('visible');
+    }
+
+    // ── Last Update cell tooltip ───────────────────────────────────────────
     document.getElementById('pkg-tbody').addEventListener('mouseenter', e => {
-      const btn = e.target.closest('.btn-changelog');
-      if (!btn) return;
-      const rect = btn.getBoundingClientRect();
-      clTooltip.textContent = btn.closest('.btn-changelog-wrap').dataset.tooltip;
-      // Position above the button, centred horizontally
-      clTooltip.style.left = (rect.left + rect.width / 2) + 'px';
-      clTooltip.style.top  = (rect.top - 8) + 'px';
-      clTooltip.style.transform = 'translateX(-50%) translateY(-100%) scale(0.92)';
-      // Force reflow so the transition fires from the initial state
-      clTooltip.getBoundingClientRect();
-      clTooltip.classList.add('visible');
-      clTooltip.style.transform = 'translateX(-50%) translateY(-100%) scale(1)';
+      const td = e.target.closest('td.col-date');
+      if (!td || !td.dataset.iso) return;
+      const d = new Date(td.dataset.iso);
+      if (isNaN(d.getTime())) return;
+      const label = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      showTooltip(label, td.getBoundingClientRect(), false);
     }, true);
 
     document.getElementById('pkg-tbody').addEventListener('mouseleave', e => {
-      if (!e.target.closest('.btn-changelog')) return;
-      clTooltip.classList.remove('visible');
+      if (e.target.closest('td.col-date')) hideTooltip();
+    }, true);
+
+    // ── Changelog button delegation ────────────────────────────────────────
+    document.getElementById('pkg-tbody').addEventListener('mouseenter', e => {
+      const btn = e.target.closest('.btn-changelog');
+      if (!btn) return;
+      const text = btn.closest('.btn-changelog-wrap').dataset.tooltip;
+      showTooltip(text, btn.getBoundingClientRect(), true);
+    }, true);
+
+    document.getElementById('pkg-tbody').addEventListener('mouseleave', e => {
+      if (e.target.closest('.btn-changelog')) hideTooltip();
     }, true);
 
     document.getElementById('pkg-tbody').addEventListener('click', e => {
       const target = e.target.closest('.btn-changelog');
       if (!target) return;
-      clTooltip.classList.remove('visible');
+      hideTooltip();
       vscode.postMessage({ command: 'openChangelog', url: target.dataset.url });
     });
 
