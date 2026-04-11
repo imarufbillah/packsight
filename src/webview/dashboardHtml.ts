@@ -1564,6 +1564,18 @@ export function getDashboardHtml(
     // ── Browse & Install panel ─────────────────────────────────────────────
     let browseSearchTimer = null;
 
+    const BROWSE_IDLE_HTML =
+      '<div class="browse-state" id="browse-idle">' +
+      '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" fill="currentColor"/></svg>' +
+      '<span>Search for any npm package to browse and install it into your project.</span>' +
+      '</div>';
+
+    function resetBrowsePanel() {
+      clearTimeout(browseSearchTimer);
+      document.getElementById('browse-search-input').value = '';
+      document.getElementById('browse-results').innerHTML = BROWSE_IDLE_HTML;
+    }
+
     function openBrowsePanel() {
       document.getElementById('browse-backdrop').classList.add('visible');
       document.getElementById('browse-search-input').focus();
@@ -1571,6 +1583,7 @@ export function getDashboardHtml(
 
     function closeBrowsePanel() {
       document.getElementById('browse-backdrop').classList.remove('visible');
+      resetBrowsePanel();
     }
 
     function setBrowseLoading() {
@@ -1634,7 +1647,10 @@ export function getDashboardHtml(
     document.getElementById('browse-search-input').addEventListener('input', () => {
       clearTimeout(browseSearchTimer);
       const q = document.getElementById('browse-search-input').value.trim();
-      if (!q) return;
+      if (!q) {
+        document.getElementById('browse-results').innerHTML = BROWSE_IDLE_HTML;
+        return;
+      }
       browseSearchTimer = setTimeout(doSearch, 400);
     });
 
