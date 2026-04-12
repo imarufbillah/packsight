@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { runCommand, searchNpmPackages } from '../services/npmService';
-import { ExtensionMessage, WebviewMessage } from '../types/dashboard';
+import { DashboardPackage, ExtensionMessage, WebviewMessage } from '../types/dashboard';
+
+type OptimisticMutator = (
+  packages: DashboardPackage[]
+) => DashboardPackage[];
 
 /**
  * Handles a postMessage arriving from the webview.
@@ -10,16 +14,18 @@ import { ExtensionMessage, WebviewMessage } from '../types/dashboard';
  *  - We get a real success/failure signal to post back to the webview
  *  - Works cross-platform (no `; exit` shell separator needed)
  *
- * @param message       - Discriminated-union message from the webview
- * @param webview       - The panel's webview (used to post replies)
- * @param workspaceRoot - Absolute path to the workspace root
- * @param onRefresh     - Callback that re-fetches data and sends loadData
+ * @param message          - Discriminated-union message from the webview
+ * @param webview          - The panel's webview (used to post replies)
+ * @param workspaceRoot    - Absolute path to the workspace root
+ * @param onRefresh        - Callback that re-fetches data and sends loadData
+ * @param onOptimistic     - Callback that mutates the cache and posts instantly
  */
 export async function handleWebviewMessage(
   message: WebviewMessage,
   webview: vscode.Webview,
   workspaceRoot: string,
-  onRefresh: () => Promise<void>
+  onRefresh: () => Promise<void>,
+  onOptimistic: (mutate: OptimisticMutator) => void = () => { /* no-op when no cache */ }
 ): Promise<void> {
   const post = (msg: ExtensionMessage): void => {
     void webview.postMessage(msg);
@@ -41,7 +47,8 @@ export async function handleWebviewMessage(
         const saveFlag = isDev ? '--save-dev' : '--save';
         await runCommand(`npm uninstall ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
         post({ command: 'operationSuccess', message: `Uninstalled ${packageName}` });
-        await onRefresh();
+        onOptimistic(pkgs => pkgs.filter(p => p.name !== packageName));
+        void onRefresh();
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         post({ command: 'operationError', message: `Could not uninstall ${packageName} — ${detail}` });
@@ -60,7 +67,12 @@ export async function handleWebviewMessage(
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
         await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
         post({ command: 'operationSuccess', message: `Updated ${packageName} to latest` });
-        await onRefresh();
+        onOptimistic(pkgs => pkgs.map(p =>
+          p.name === packageName
+            ? { ...p, version: p.latest ?? p.version, latest: null }
+            : p
+        ));
+        void onRefresh();
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         post({ command: 'operationError', message: `Could not update ${packageName} — ${detail}` });
@@ -76,11 +88,13 @@ export async function handleWebviewMessage(
         .trim();
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
       let failed = 0;
+      const succeeded = new Set<string>();
 
       for (const packageName of packageNames) {
         post({ command: 'operationStart', packageName });
         try {
           await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
+          succeeded.add(packageName);
         } catch {
           failed++;
         }
@@ -91,7 +105,12 @@ export async function handleWebviewMessage(
       } else {
         post({ command: 'operationError', message: `${packageNames.length - failed} updated, ${failed} failed` });
       }
-      await onRefresh();
+      onOptimistic(pkgs => pkgs.map(p =>
+        succeeded.has(p.name)
+          ? { ...p, version: p.latest ?? p.version, latest: null }
+          : p
+      ));
+      void onRefresh();
       break;
     }
 
@@ -134,7 +153,15 @@ export async function handleWebviewMessage(
         const saveFlag = isDev ? '--save-dev' : '--save';
         await runCommand(`npm install ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
         post({ command: 'operationSuccess', message: `Installed ${packageName}` });
-        await onRefresh();
+        onOptimistic(pkgs => {
+          if (pkgs.some(p => p.name === packageName)) { return pkgs; }
+          return [...pkgs, {
+            name: packageName, version: 'latest', latest: null,
+            isUnused: false, isDev, lastUpdated: null, size: null,
+            repoUrl: null, vulnSeverity: null,
+          }];
+        });
+        void onRefresh();
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         post({ command: 'operationError', message: `Could not install ${packageName} — ${detail}` });

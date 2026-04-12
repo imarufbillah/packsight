@@ -53,6 +53,7 @@ export class DashboardPanel {
           this.panel.webview,
           this.workspaceRoot,
           () => this.loadData(true), // user-triggered: always bypass cache
+          (mutate) => this.applyOptimisticUpdate(mutate),
         );
       },
       undefined,
@@ -133,6 +134,26 @@ export class DashboardPanel {
    */
   public static isOpen(): boolean {
     return DashboardPanel.instance !== undefined;
+  }
+
+  /**
+   * Applies an optimistic mutation to the cached data and posts it
+   * immediately so the UI updates without waiting for registry fetches.
+   * The full background refresh will follow and correct any inaccuracies.
+   */
+  public applyOptimisticUpdate(
+    mutate: (packages: DashboardData['packages']) => DashboardData['packages']
+  ): void {
+    if (!DashboardPanel.cachedData) { return; }
+    const updated: DashboardData = {
+      ...DashboardPanel.cachedData,
+      packages: mutate(DashboardPanel.cachedData.packages),
+    };
+    DashboardPanel.cachedData = updated;
+    void this.panel.webview.postMessage({
+      command: 'loadData',
+      payload: updated,
+    } satisfies ExtensionMessage);
   }
 
   /**
