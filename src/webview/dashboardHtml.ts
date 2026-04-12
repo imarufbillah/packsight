@@ -565,6 +565,7 @@ export function getDashboardHtml(
     .vuln-high     { color: #fb923c; }
     .vuln-moderate { color: #fbbf24; }
     .vuln-low      { color: #a3e635; }
+    .vuln-secure   { color: var(--accent-green); opacity: 0.7; }
     .latest-dash { color: var(--vscode-descriptionForeground); opacity: 0.4; }
     td.col-date {
       font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
@@ -1549,11 +1550,12 @@ export function getDashboardHtml(
 
         const devTag = pkg.isDev ? '<span class="dev-tag">dev</span>' : '';
 
-        // Shield SVG — same path for all severities, colour set by class
-        const SHIELD_SVG = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2 4v4c0 3.31 2.5 5.8 6 6.5 3.5-.7 6-3.19 6-6.5V4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 15%, transparent)"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+        // Shield with exclamation for vulnerabilities, shield with checkmark for secure
+        const SHIELD_VULN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2 4v4c0 3.31 2.5 5.8 6 6.5 3.5-.7 6-3.19 6-6.5V4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 15%, transparent)"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+        const SHIELD_OK   = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2 4v4c0 3.31 2.5 5.8 6 6.5 3.5-.7 6-3.19 6-6.5V4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 15%, transparent)"/><path d="M5.5 8l1.8 1.8L10.5 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         const vulnIcon = pkg.vulnSeverity
-          ? \`<span class="vuln-icon vuln-\${pkg.vulnSeverity}" data-vuln="\${pkg.vulnSeverity}" aria-label="\${pkg.vulnSeverity} vulnerability">\${SHIELD_SVG}</span>\`
-          : '';
+          ? \`<span class="vuln-icon vuln-\${pkg.vulnSeverity}" data-vuln="\${pkg.vulnSeverity}" aria-label="\${pkg.vulnSeverity} vulnerability">\${SHIELD_VULN}</span>\`
+          : \`<span class="vuln-icon vuln-secure" data-vuln="secure" aria-label="No known vulnerabilities">\${SHIELD_OK}</span>\`;
 
         const updateBtn = pkg.latest !== null
           ? \`<button class="btn-primary btn-update"
@@ -2071,6 +2073,7 @@ export function getDashboardHtml(
       high:     '🟠 High severity vulnerability detected',
       moderate: '🟡 Moderate severity vulnerability detected',
       low:      '🟢 Low severity vulnerability detected',
+      secure:   '✅ No known vulnerabilities',
     };
     document.getElementById('pkg-tbody').addEventListener('mouseenter', e => {
       const icon = e.target.closest('.vuln-icon');
