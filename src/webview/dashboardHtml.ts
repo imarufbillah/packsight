@@ -238,7 +238,7 @@ export function getDashboardHtml(
     /* ── Stats bar ───────────────────────────────────────────────────────── */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 16px;
       margin-bottom: 28px;
     }
@@ -288,6 +288,13 @@ export function getDashboardHtml(
     .stat-card.card-unused::after  { background: var(--accent-yellow); }
     .stat-card.card-outdated::before{ background: var(--accent-green); }
     .stat-card.card-outdated::after { background: var(--accent-green); }
+    .stat-card.card-security::before{ background: var(--accent-red); }
+    .stat-card.card-security::after { background: var(--accent-red); }
+    .stat-card.card-security.secure::before{ background: var(--accent-green); }
+    .stat-card.card-security.secure::after { background: var(--accent-green); }
+    /* Security stat value colours */
+    #stat-security.has-vulns { color: var(--accent-red); }
+    #stat-security.is-secure  { color: var(--accent-green); font-size: 1.1em; }
 
     .stat-label {
       font-size: 0.76em;
@@ -1165,6 +1172,13 @@ export function getDashboardHtml(
       </div>
       <div class="stat-value" id="stat-outdated">—</div>
     </div>
+    <div class="stat-card card-security" id="stat-card-security">
+      <div class="stat-label">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2.5 4.2v4.3c0 3.1 2.3 5.4 5.5 6.1 3.2-.7 5.5-3 5.5-6.1V4.2L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 10%, transparent)"/><path d="M5.5 8l1.8 1.8L10.5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Security
+      </div>
+      <div class="stat-value" id="stat-security">—</div>
+    </div>
   </div>
 
   <!-- Toolbar: search left, runtime badges centre, tabs right -->
@@ -1316,11 +1330,26 @@ export function getDashboardHtml(
       const dev      = allPackages.filter(p => p.isDev).length;
       const unused   = allPackages.filter(p => p.isUnused).length;
       const outdated = allPackages.filter(p => p.latest !== null).length;
+      const vulnPkgs = allPackages.filter(p => p.vulnSeverity !== null);
+      const vulnCount = vulnPkgs.length;
 
       animateCount(document.getElementById('stat-total'),    total);
       animateCount(document.getElementById('stat-dev'),      dev);
       animateCount(document.getElementById('stat-unused'),   unused);
       animateCount(document.getElementById('stat-outdated'), outdated);
+
+      // Security card
+      const secEl   = document.getElementById('stat-security');
+      const secCard = document.getElementById('stat-card-security');
+      if (vulnCount > 0) {
+        animateCount(secEl, vulnCount);
+        secEl.className  = 'stat-value has-vulns';
+        secCard.classList.remove('secure');
+      } else {
+        secEl.textContent = '✓';
+        secEl.className   = 'stat-value is-secure';
+        secCard.classList.add('secure');
+      }
 
       // Tab badge pills
       setTabCount('tc-all',      total,    true);
