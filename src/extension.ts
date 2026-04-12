@@ -3,6 +3,7 @@ import { SidebarWebviewProvider } from './webview/sidebarWebview';
 import { registerToggleCommands, setDashboardOpen } from './commands/toggleDashboard';
 import { DashboardPanel } from './webview/dashboardPanel';
 import { dependencyChanged } from './events/dependencyEventEmitter';
+import { runCommand } from './services/npmService';
 import { COMMANDS, CONTEXT_KEYS, VIEW_ID, WATCHER_DEBOUNCE_MS } from './constants';
 
 /**
@@ -114,7 +115,6 @@ export function activate(context: vscode.ExtensionContext): void {
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
       const saveFlag = isDev ? '--save-dev' : '--save';
       try {
-        const { runCommand } = await import('./services/npmService');
         await runCommand(`npm uninstall ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
         sidebarProvider.refresh();
       } catch (err: unknown) {
@@ -133,7 +133,6 @@ export function activate(context: vscode.ExtensionContext): void {
       const flags = cfg.get<string>('updateFlags', '--legacy-peer-deps').trim();
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
       try {
-        const { runCommand } = await import('./services/npmService');
         await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
         sidebarProvider.refresh();
       } catch (err: unknown) {
