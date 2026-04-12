@@ -508,6 +508,50 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
     }
     .state-icon { font-size: 16px; }
 
+    /* ── Tip rotator ── */
+    .tip-wrap {
+      flex-shrink: 0;
+      padding: 7px 12px 6px;
+      min-height: 44px;
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      position: relative;
+      overflow: hidden;
+    }
+    .tip-icon {
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: var(--vscode-charts-blue, #3b82f6);
+      opacity: 0.8;
+    }
+    .tip-text {
+      font-size: 0.78em;
+      color: var(--vscode-descriptionForeground);
+      line-height: 1.45;
+      opacity: 1;
+      transition: opacity 350ms ease, transform 350ms ease;
+    }
+    .tip-text.fade-out {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    .tip-text.fade-in {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    .tip-kbd {
+      display: inline-block;
+      background: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 80%, transparent);
+      border-radius: 3px;
+      padding: 0 4px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 0.88em;
+      line-height: 1.5;
+    }
+
     /* ── Quick links ── */
     .links-section { flex-shrink: 0; }
     .link-btn {
@@ -627,6 +671,13 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
   <div class="pkg-list">${pkgList}</div>
   <div class="divider"></div>
 
+  <!-- Tip rotator -->
+  <div class="divider"></div>
+  <div class="tip-wrap">
+    <span class="codicon codicon-lightbulb tip-icon"></span>
+    <span class="tip-text" id="tip-text"></span>
+  </div>
+
   <!-- Quick links -->
   <div class="links-section">
     <div class="section-header">
@@ -694,6 +745,47 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
       const collapsed = body.classList.toggle('collapsed');
       chev.classList.toggle('collapsed', collapsed);
     }
+
+    // ── Tip rotator ────────────────────────────────────────────────────────
+    const TIPS = [
+      '<kbd>Ctrl+Shift+P</kbd> → <em>PackSight: Open Package Manager</em>',
+      'Right-click <kbd>package.json</kbd> → <em>Open Package Manager</em>',
+      'Hover a package row to reveal Update, Copy, and Uninstall actions',
+      'Click a package name to open it on <em>npmjs.com</em>',
+      'The shield icon next to each package shows its security status',
+      'Use <kbd>Ctrl + scroll</kbd> to zoom the dashboard in or out',
+      'The dashboard caches data — re-opening it is instant',
+      'Outdated packages show a <em>Major / Minor / Patch</em> bump badge',
+      'Select multiple packages with checkboxes for a bulk update',
+      'Hover the <em>Last Update</em> date to see the exact publish date',
+      'The <em>Browse &amp; Install</em> button lets you search and install any npm package',
+      'Unused packages are detected by scanning your source imports',
+      'The Security card shows total vulnerabilities found by <em>npm audit</em>',
+    ];
+
+    const tipEl = document.getElementById('tip-text');
+    let tipIdx  = Math.floor(Math.random() * TIPS.length);
+
+    function showTip(html) {
+      tipEl.classList.add('fade-out');
+      setTimeout(() => {
+        tipEl.innerHTML = html.replace(/<kbd>/g, '<span class="tip-kbd">').replace(/<\\/kbd>/g, '</span>');
+        tipEl.classList.remove('fade-out');
+        tipEl.classList.add('fade-in');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          tipEl.classList.remove('fade-in');
+        }));
+      }, 360);
+    }
+
+    // Show first tip immediately
+    tipEl.innerHTML = TIPS[tipIdx].replace(/<kbd>/g, '<span class="tip-kbd">').replace(/<\\/kbd>/g, '</span>');
+
+    // Rotate every 6 seconds
+    setInterval(() => {
+      tipIdx = (tipIdx + 1) % TIPS.length;
+      showTip(TIPS[tipIdx]);
+    }, 6000);
   </script>
 </body>
 </html>`;
