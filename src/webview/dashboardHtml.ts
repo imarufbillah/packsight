@@ -69,6 +69,7 @@ export function getDashboardHtml(
       padding: 28px 32px 48px;
       min-height: 100vh;
       line-height: 1.6;
+      zoom: var(--ui-scale, 1);
     }
 
     /* ── Page-load stagger animation ─────────────────────────────────────── */
@@ -124,6 +125,49 @@ export function getDashboardHtml(
       padding: 5px 12px;
     }
     .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* ── UI scale control ────────────────────────────────────────────────── */
+    .scale-control {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+      border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .scale-btn {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      color: var(--vscode-foreground);
+      font-size: 1em;
+      font-weight: 600;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+      line-height: 1;
+    }
+    .scale-btn:hover { background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent); }
+    .scale-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    #scale-label {
+      font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace;
+      font-size: 0.72em;
+      font-weight: 600;
+      color: var(--vscode-descriptionForeground);
+      min-width: 36px;
+      text-align: center;
+      padding: 0 2px;
+      border-left: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      border-right: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      cursor: default;
+      user-select: none;
+    }
 
     /* ── Buttons ─────────────────────────────────────────────────────────── */
     button {
@@ -1068,6 +1112,11 @@ export function getDashboardHtml(
     <div class="header-right">
       <div id="project-name"></div>
       <div class="header-actions">
+        <div class="scale-control" title="Adjust UI scale">
+          <button class="scale-btn" id="btn-scale-down" aria-label="Decrease UI scale">−</button>
+          <span id="scale-label">100%</span>
+          <button class="scale-btn" id="btn-scale-up" aria-label="Increase UI scale">+</button>
+        </div>
         <button class="btn-secondary" id="btn-browse">
           <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1a.5.5 0 0 1 .5.5v1h1.5a.5.5 0 0 1 0 1H12v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 11.5V3.5h-.5a.5.5 0 0 1 0-1H3v-1a.5.5 0 0 1 1 0v1h7v-1a.5.5 0 0 1 .5-.5zM3 3.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8H3zm2 2a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm4 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm-2 0a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>
           Browse &amp; Install
@@ -1675,6 +1724,37 @@ export function getDashboardHtml(
       if (e.key === 'Escape' && document.getElementById('browse-backdrop').classList.contains('visible')) {
         closeBrowsePanel();
       }
+    });
+
+    // ── UI scale control ───────────────────────────────────────────────────
+    const SCALE_MIN  = 0.7;
+    const SCALE_MAX  = 1.4;
+    const SCALE_STEP = 0.05;
+    const SCALE_KEY  = 'packSight.uiScale';
+
+    function applyScale(scale) {
+      document.body.style.setProperty('--ui-scale', scale);
+      document.getElementById('scale-label').textContent = Math.round(scale * 100) + '%';
+      document.getElementById('btn-scale-down').disabled = scale <= SCALE_MIN;
+      document.getElementById('btn-scale-up').disabled   = scale >= SCALE_MAX;
+      try { localStorage.setItem(SCALE_KEY, String(scale)); } catch {}
+    }
+
+    // Restore persisted scale on load
+    (function () {
+      let saved = 1;
+      try { saved = parseFloat(localStorage.getItem(SCALE_KEY) || '1') || 1; } catch {}
+      saved = Math.min(SCALE_MAX, Math.max(SCALE_MIN, saved));
+      applyScale(saved);
+    })();
+
+    document.getElementById('btn-scale-down').addEventListener('click', () => {
+      const cur = parseFloat(document.body.style.getPropertyValue('--ui-scale') || '1');
+      applyScale(Math.max(SCALE_MIN, Math.round((cur - SCALE_STEP) * 100) / 100));
+    });
+    document.getElementById('btn-scale-up').addEventListener('click', () => {
+      const cur = parseFloat(document.body.style.getPropertyValue('--ui-scale') || '1');
+      applyScale(Math.min(SCALE_MAX, Math.round((cur + SCALE_STEP) * 100) / 100));
     });
 
     // ── User interactions ──────────────────────────────────────────────────
