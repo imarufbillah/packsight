@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
 import { DependencyTreeProvider } from './tree/dependencyTreeProvider';
-import { ViewSwitchProvider } from './tree/viewSwitchProvider';
-import { QuickLinksProvider } from './tree/quickLinksProvider';
+import { ViewSwitchWebviewProvider } from './webview/viewSwitchWebview';
+import { QuickLinksWebviewProvider } from './webview/quickLinksWebview';
 import { refreshCommand } from './commands/refresh';
 import { uninstallCommand } from './commands/uninstall';
 import { updateCommand } from './commands/update';
 import { registerToggleCommands, setDashboardOpen } from './commands/toggleDashboard';
 import { DashboardPanel } from './webview/dashboardPanel';
 import { dependencyChanged } from './events/dependencyEventEmitter';
-import { COMMANDS, CONTEXT_KEYS, VIEW_ID, VIEW_SWITCH_ID, VIEW_QUICK_LINKS_ID, WATCHER_DEBOUNCE_MS } from './constants';
+import { COMMANDS, CONTEXT_KEYS, VIEW_ID, WATCHER_DEBOUNCE_MS } from './constants';
 import { DependencyItem } from './tree/dependencyItem';
 
 /**
@@ -37,13 +37,23 @@ export function activate(context: vscode.ExtensionContext): void {
     DashboardPanel.createOrShow(context, workspaceRoot);
   }
 
-  // ── View-switch provider (top of sidebar) ──────────────────────────────────
-  const viewSwitchProvider = new ViewSwitchProvider();
+  // ── View-switch webview (top of sidebar) ──────────────────────────────────
+  const viewSwitchProvider = new ViewSwitchWebviewProvider(
+    context.extensionUri, context, workspaceRoot
+  );
   viewSwitchProvider.setDashboardOpen(wasDashboardOpen);
-  vscode.window.registerTreeDataProvider(VIEW_SWITCH_ID, viewSwitchProvider);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ViewSwitchWebviewProvider.viewId, viewSwitchProvider)
+  );
 
-  // ── Quick links provider (bottom of sidebar) ───────────────────────────────
-  vscode.window.registerTreeDataProvider(VIEW_QUICK_LINKS_ID, new QuickLinksProvider());
+  // ── Quick links webview (bottom of sidebar) ────────────────────────────────
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      QuickLinksWebviewProvider.viewId,
+      new QuickLinksWebviewProvider(context.extensionUri),
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
 
   // ── Tree provider ──────────────────────────────────────────────────────────
   const treeProvider = new DependencyTreeProvider(workspaceRoot);

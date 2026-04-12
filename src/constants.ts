@@ -1,7 +1,5 @@
 /** VS Code view/command identifiers — single source of truth */
 export const VIEW_ID = 'packSight.dependencies' as const;
-export const VIEW_SWITCH_ID = 'packSight.viewSwitch' as const;
-export const VIEW_QUICK_LINKS_ID = 'packSight.quickLinks' as const;
 
 export const COMMANDS = {
   REFRESH: 'packSight.refresh',
