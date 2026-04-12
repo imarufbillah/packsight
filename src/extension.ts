@@ -3,7 +3,7 @@ import { SidebarWebviewProvider } from './webview/sidebarWebview';
 import { registerToggleCommands, setDashboardOpen } from './commands/toggleDashboard';
 import { DashboardPanel } from './webview/dashboardPanel';
 import { dependencyChanged } from './events/dependencyEventEmitter';
-import { runCommand } from './services/npmService';
+import { runCommand, invalidateAuditCache } from './services/npmService';
 import { COMMANDS, CONTEXT_KEYS, VIEW_ID, WATCHER_DEBOUNCE_MS } from './constants';
 
 /**
@@ -77,6 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (debounceTimer !== undefined) { clearTimeout(debounceTimer); }
     debounceTimer = setTimeout(() => {
       debounceTimer = undefined;
+      invalidateAuditCache(); // package.json changed — re-run audit next load
       sidebarProvider.refresh();
       if (DashboardPanel.isOpen()) {
         const panel = DashboardPanel.createOrShow(context, workspaceRoot);
@@ -90,13 +91,18 @@ export function activate(context: vscode.ExtensionContext): void {
   watcher.onDidDelete(scheduleRefresh);
 
   // ── Dashboard ↔ Sidebar data sync ─────────────────────────────────────────
+  let depChangedTimer: ReturnType<typeof setTimeout> | undefined;
   const dashboardSyncDisposable = dependencyChanged.event(() => {
-    // Refresh sidebar whenever dependencies change (dashboard ops, file watcher, etc.)
-    sidebarProvider.refresh();
-    if (DashboardPanel.isOpen()) {
-      const panel = DashboardPanel.createOrShow(context, workspaceRoot);
-      void panel.loadData(true);
-    }
+    // Debounce rapid-fire events (e.g. multiple operations completing close together)
+    if (depChangedTimer !== undefined) { clearTimeout(depChangedTimer); }
+    depChangedTimer = setTimeout(() => {
+      depChangedTimer = undefined;
+      sidebarProvider.refresh();
+      if (DashboardPanel.isOpen()) {
+        const panel = DashboardPanel.createOrShow(context, workspaceRoot);
+        void panel.loadData(true);
+      }
+    }, 300);
   });
 
   // ── Commands ───────────────────────────────────────────────────────────────

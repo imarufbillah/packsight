@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
 import { parseDependencies } from "../services/dependencyService";
-import { getOutdatedPackages, getPackagesLastUpdated, getPackageSizes, getPackageRepoUrls, getRuntimeVersions, getVulnerabilities } from "../services/npmService";
+import { getPackageRegistryDataBatch, getRuntimeVersions, getVulnerabilities, invalidateAuditCache } from "../services/npmService";
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
@@ -185,9 +187,12 @@ export class DashboardPanel {
     let data: DashboardData;
 
     try {
-      const { dependencies, devDependencies } = parseDependencies(
-        this.workspaceRoot,
-      );
+      const pkgJsonPath = path.join(this.workspaceRoot, 'package.json');
+      const pkgJsonContent = fs.existsSync(pkgJsonPath)
+        ? fs.readFileSync(pkgJsonPath, 'utf-8')
+        : '';
+
+      const { dependencies, devDependencies } = parseDependencies(this.workspaceRoot);
       const usedPackages = scanUsedPackages(this.workspaceRoot);
 
       const allEntries = [
@@ -195,37 +200,41 @@ export class DashboardPanel {
         ...devDependencies.map((p) => ({ ...p, isDev: true })),
       ];
 
-      // Fetch outdated, last-updated, sizes, repo URLs, runtime versions, and vulnerabilities in parallel
-      const [outdatedMap, lastUpdatedMap, sizeMap, repoUrlMap, runtimeVersions, vulnMap] = await Promise.all([
-        getOutdatedPackages(allEntries),
-        getPackagesLastUpdated(allEntries),
-        getPackageSizes(allEntries),
-        getPackageRepoUrls(allEntries),
+      // Single batched registry call + runtime + audit in parallel
+      // (was 6 separate parallel fetches totalling ~30 child processes)
+      const [registryMap, runtimeVersions, vulnMap] = await Promise.all([
+        getPackageRegistryDataBatch(allEntries),
         getRuntimeVersions(),
-        getVulnerabilities(this.workspaceRoot),
+        getVulnerabilities(this.workspaceRoot, pkgJsonContent),
       ]);
 
       data = {
         workspaceRoot: this.workspaceRoot,
         nodeVersion: runtimeVersions.node,
         npmVersion: runtimeVersions.npm,
-        packages: allEntries.map((entry) => ({
-          name: entry.name,
-          version: entry.version,
-          latest: outdatedMap.get(entry.name)?.latest ?? null,
-          isUnused: !usedPackages.has(entry.name),
-          isDev: entry.isDev,
-          lastUpdated: lastUpdatedMap.get(entry.name) ?? null,
-          size: sizeMap.get(entry.name) ?? null,
-          repoUrl: repoUrlMap.get(entry.name) ?? null,
-          vulnSeverity: vulnMap.get(entry.name) ?? null,
-        })),
+        packages: allEntries.map((entry) => {
+          const reg = registryMap.get(entry.name);
+          const installed = entry.version.replace(/^[^\d]+/, '') || entry.version;
+          const latest = reg?.latest && reg.latest !== installed
+            ? reg.latest
+            : null;
+          return {
+            name: entry.name,
+            version: entry.version,
+            latest,
+            isUnused: !usedPackages.has(entry.name),
+            isDev: entry.isDev,
+            lastUpdated: reg?.lastUpdated ?? null,
+            size: reg?.size ?? null,
+            repoUrl: reg?.repoUrl ?? null,
+            vulnSeverity: vulnMap.get(entry.name) ?? null,
+          };
+        }),
       };
-    } catch (err) {
+    } catch {
       data = { workspaceRoot: this.workspaceRoot, packages: [], nodeVersion: null, npmVersion: null };
     }
 
-    // Update the cache and push fresh data to the webview
     DashboardPanel.cachedData = data;
     void this.panel.webview.postMessage({
       command: "loadData",

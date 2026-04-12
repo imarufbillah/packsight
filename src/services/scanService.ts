@@ -4,23 +4,45 @@ import { parse, type TSESTree } from '@typescript-eslint/typescript-estree';
 import { collectSourceFiles } from '../utils/fileScanner';
 import { extractPackageName } from '../utils/packageNameExtractor';
 
+// ─── Scan cache ───────────────────────────────────────────────────────────────
+// Key: workspaceRoot, Value: { result, filesMtime }
+// Invalidated when any scanned file's mtime changes or files are added/removed.
+
+interface ScanCache {
+  result: Set<string>;
+  /** Sorted list of "filepath:mtime" strings used as a fingerprint */
+  fingerprint: string;
+}
+
+const scanCache = new Map<string, ScanCache>();
+
+/** Invalidate the scan cache for a workspace (call when source files change). */
+export function invalidateScanCache(workspaceRoot: string): void {
+  scanCache.delete(workspaceRoot);
+}
+
+function buildFingerprint(files: string[]): string {
+  return files
+    .map(f => {
+      try { return `${f}:${fs.statSync(f).mtimeMs}`; } catch { return f; }
+    })
+    .join('|');
+}
+
 /**
  * Scans all source files in the workspace using AST parsing and returns
  * the set of npm package names that are actually imported at runtime.
- *
- * Import classification:
- *  - `import X from 'pkg'`          → USED
- *  - `import { X } from 'pkg'`      → USED
- *  - `import * as X from 'pkg'`     → USED
- *  - `import 'pkg'`                 → USED  (side-effect)
- *  - `require('pkg')`               → USED
- *  - `import type ... from 'pkg'`   → NOT used (type-only, erased at runtime)
- *
- * @param workspaceRoot - Absolute path to the workspace root
- * @returns Set of package names that are used at runtime
+ * Results are cached and only re-computed when source files change.
  */
 export function scanUsedPackages(workspaceRoot: string): Set<string> {
   const files = collectSourceFiles(workspaceRoot);
+  const fingerprint = buildFingerprint(files);
+
+  const cached = scanCache.get(workspaceRoot);
+  if (cached && cached.fingerprint === fingerprint) {
+    return cached.result;
+  }
+
   const used = new Set<string>();
 
   for (const filePath of files) {
@@ -31,10 +53,8 @@ export function scanUsedPackages(workspaceRoot: string): Set<string> {
 
       const ast = parse(source, {
         jsx: ext === '.jsx' || ext === '.tsx',
-        // Use 'module' so top-level imports are valid
-        // For .ts/.tsx we enable TypeScript-specific syntax
         ...(isTs ? { range: false } : {}),
-        errorRecovery: true, // don't abort on partial parse errors
+        errorRecovery: true,
       });
 
       collectFromAst(ast, used);
@@ -43,6 +63,7 @@ export function scanUsedPackages(workspaceRoot: string): Set<string> {
     }
   }
 
+  scanCache.set(workspaceRoot, { result: used, fingerprint });
   return used;
 }
 
