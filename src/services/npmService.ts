@@ -390,17 +390,6 @@ export async function searchNpmPackages(
 /** Severity levels returned by npm audit */
 export type VulnSeverity = 'critical' | 'high' | 'moderate' | 'low';
 
-/** Raw shape of a single entry in npm audit --json `vulnerabilities` map */
-interface AuditVulnerability {
-  severity?: string;
-  effects?: string[];
-}
-
-/** Raw shape of the npm audit --json output */
-interface AuditJson {
-  vulnerabilities?: Record<string, AuditVulnerability>;
-}
-
 /**
  * Runs `npm audit --json` in the workspace and returns a map of
  * package name → highest severity found.
@@ -408,6 +397,7 @@ interface AuditJson {
  * npm audit exits with a non-zero code when vulnerabilities are found,
  * so we must not reject on error — we parse stdout regardless.
  *
+ * Handles both audit report v1 (advisories map) and v2 (vulnerabilities map).
  * Returns an empty map if audit cannot run (e.g. no package-lock.json).
  */
 export async function getVulnerabilities(
@@ -417,28 +407,61 @@ export async function getVulnerabilities(
     critical: 4, high: 3, moderate: 2, low: 1, info: 0,
   };
 
+  function rankSeverity(result: Map<string, VulnSeverity>, name: string, sev: string): void {
+    const s = sev.toLowerCase();
+    if (!(s in SEVERITY_RANK) || s === 'info') { return; }
+    const existing = result.get(name);
+    if (!existing || SEVERITY_RANK[s] > SEVERITY_RANK[existing]) {
+      result.set(name, s as VulnSeverity);
+    }
+  }
+
   return new Promise((resolve) => {
     cp.exec(
       'npm audit --json',
       { cwd: workspaceRoot, timeout: 30000 },
       (_error, stdout) => {
-        // npm audit exits non-zero when vulns exist — always try to parse stdout
         if (!stdout.trim()) { resolve(new Map()); return; }
         try {
-          const data = JSON.parse(stdout.trim()) as AuditJson;
-          const vulns = data.vulnerabilities;
-          if (!vulns || typeof vulns !== 'object') { resolve(new Map()); return; }
+          const data = JSON.parse(stdout.trim()) as Record<string, unknown>;
+
+          // Bail out if npm returned an error object (e.g. ENOLOCK)
+          if (data['error']) { resolve(new Map()); return; }
 
           const result = new Map<string, VulnSeverity>();
-          for (const [name, info] of Object.entries(vulns)) {
-            const sev = (info.severity ?? '').toLowerCase();
-            if (sev in SEVERITY_RANK && sev !== 'info') {
-              const existing = result.get(name);
-              if (!existing || SEVERITY_RANK[sev] > SEVERITY_RANK[existing]) {
-                result.set(name, sev as VulnSeverity);
+
+          // ── Audit report v2: data.vulnerabilities ─────────────────────────
+          const vulnsV2 = data['vulnerabilities'];
+          if (vulnsV2 && typeof vulnsV2 === 'object') {
+            for (const [name, info] of Object.entries(vulnsV2 as Record<string, Record<string, unknown>>)) {
+              const sev = String(info['severity'] ?? '');
+              rankSeverity(result, name, sev);
+            }
+            resolve(result);
+            return;
+          }
+
+          // ── Audit report v1: data.advisories ─────────────────────────────
+          const advisories = data['advisories'];
+          if (advisories && typeof advisories === 'object') {
+            for (const advisory of Object.values(advisories as Record<string, Record<string, unknown>>)) {
+              const sev = String(advisory['severity'] ?? '');
+              const findings = advisory['findings'];
+              if (Array.isArray(findings)) {
+                for (const finding of findings as Array<Record<string, unknown>>) {
+                  const paths = finding['paths'];
+                  if (Array.isArray(paths)) {
+                    for (const p of paths as string[]) {
+                      // paths are like "lodash" or "express>lodash" — take the leaf
+                      const leaf = p.split('>').pop() ?? p;
+                      rankSeverity(result, leaf, sev);
+                    }
+                  }
+                }
               }
             }
           }
+
           resolve(result);
         } catch {
           resolve(new Map());
