@@ -39,14 +39,21 @@ export class DashboardPanel {
     // 'ready' message from the webview script is never missed.
     this.panel.webview.onDidReceiveMessage(
       (raw: unknown) => {
-        if (isWebviewMessage(raw)) {
-          void handleWebviewMessage(
-            raw,
-            this.panel.webview,
-            this.workspaceRoot,
-            () => this.loadData(true), // always bypass cache for user-triggered operations
-          );
+        if (!isWebviewMessage(raw)) { return; }
+
+        if (raw.command === 'ready') {
+          // Serve cache instantly so the UI renders without a loading screen,
+          // then revalidate in the background.
+          void this.loadData(false);
+          return;
         }
+
+        void handleWebviewMessage(
+          raw,
+          this.panel.webview,
+          this.workspaceRoot,
+          () => this.loadData(true), // user-triggered: always bypass cache
+        );
       },
       undefined,
       this.disposables,
