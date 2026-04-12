@@ -46,7 +46,7 @@ export function getDashboardHtml(
              font-src ${cspSource};
              style-src ${cspSource} 'unsafe-inline';
              script-src 'nonce-${nonce}';" />
-  <title>Package Manager</title>
+  <title>PackSight – Package Manager</title>
   <link rel="stylesheet" href="${codiconCssUri}" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap');
@@ -1137,7 +1137,7 @@ export function getDashboardHtml(
   <!-- Header -->
   <div class="header">
     <div class="header-title">
-      <h1><img src="${logoUri}" alt="PackSight" style="height: 1.5em; width: 1.5em;" /> PackSight Dashboard</h1>
+      <h1><img src="${logoUri}" alt="PackSight" style="height: 1.5em; width: 1.5em;" /> PackSight</h1>
     </div>
     <div class="header-right">
       <div id="project-name"></div>

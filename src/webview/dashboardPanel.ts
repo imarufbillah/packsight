@@ -98,7 +98,7 @@ export class DashboardPanel {
 
     const panel = vscode.window.createWebviewPanel(
       "packSightDashboard",
-      "Package Manager",
+      "PackSight – Package Manager",
       vscode.ViewColumn.One,
       {
         enableScripts: true,
