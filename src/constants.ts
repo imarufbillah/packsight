@@ -1,5 +1,5 @@
 /** VS Code view/command identifiers — single source of truth */
-export const VIEW_ID = 'packSight.dependencies' as const;
+export const VIEW_ID = 'packSight.sidebar' as const;
 
 export const COMMANDS = {
   REFRESH: 'packSight.refresh',

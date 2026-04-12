@@ -1,15 +1,9 @@
 import * as vscode from 'vscode';
-import { DependencyTreeProvider } from './tree/dependencyTreeProvider';
-import { ViewSwitchWebviewProvider } from './webview/viewSwitchWebview';
-import { QuickLinksWebviewProvider } from './webview/quickLinksWebview';
-import { refreshCommand } from './commands/refresh';
-import { uninstallCommand } from './commands/uninstall';
-import { updateCommand } from './commands/update';
+import { SidebarWebviewProvider } from './webview/sidebarWebview';
 import { registerToggleCommands, setDashboardOpen } from './commands/toggleDashboard';
 import { DashboardPanel } from './webview/dashboardPanel';
 import { dependencyChanged } from './events/dependencyEventEmitter';
 import { COMMANDS, CONTEXT_KEYS, VIEW_ID, WATCHER_DEBOUNCE_MS } from './constants';
-import { DependencyItem } from './tree/dependencyItem';
 
 /**
  * Called by VS Code when the extension is activated.
@@ -37,46 +31,39 @@ export function activate(context: vscode.ExtensionContext): void {
     DashboardPanel.createOrShow(context, workspaceRoot);
   }
 
-  // ── View-switch webview (top of sidebar) ──────────────────────────────────
-  const viewSwitchProvider = new ViewSwitchWebviewProvider(
-    context.extensionUri, context, workspaceRoot
+  // ── Sidebar webview (single unified view) ─────────────────────────────────
+  const sidebarProvider = new SidebarWebviewProvider(
+    context.extensionUri,
+    workspaceRoot,
+    // onRefresh
+    () => { sidebarProvider.refresh(); },
+    // onUninstall
+    (name, isDev) => {
+      void vscode.commands.executeCommand(COMMANDS.UNINSTALL, { packageName: name, isDev });
+    },
+    // onUpdate
+    (name) => {
+      void vscode.commands.executeCommand(COMMANDS.UPDATE, { packageName: name });
+    },
+    // onCopyName
+    async (name) => {
+      await vscode.env.clipboard.writeText(name);
+      vscode.window.showInformationMessage(`Copied '${name}' to clipboard.`);
+    },
+    // onSwitchToDashboard
+    () => { void vscode.commands.executeCommand(COMMANDS.SWITCH_TO_DASHBOARD); },
+    // onSwitchToTreeView
+    () => { void vscode.commands.executeCommand(COMMANDS.SWITCH_TO_TREE_VIEW); },
   );
-  viewSwitchProvider.setDashboardOpen(wasDashboardOpen);
-  DashboardPanel.setViewSwitchProvider(viewSwitchProvider);
+
+  sidebarProvider.setDashboardOpen(wasDashboardOpen);
+  DashboardPanel.setViewSwitchProvider(sidebarProvider);
+
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ViewSwitchWebviewProvider.viewId, viewSwitchProvider)
+    vscode.window.registerWebviewViewProvider(VIEW_ID, sidebarProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
   );
-
-  // ── Quick links webview (bottom of sidebar) ────────────────────────────────
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      QuickLinksWebviewProvider.viewId,
-      new QuickLinksWebviewProvider(context.extensionUri),
-      { webviewOptions: { retainContextWhenHidden: true } }
-    )
-  );
-
-  // ── Tree provider ──────────────────────────────────────────────────────────
-  const treeProvider = new DependencyTreeProvider(workspaceRoot);
-
-  const treeView = vscode.window.createTreeView(VIEW_ID, {
-    treeDataProvider: treeProvider,
-    showCollapseAll: true,
-  });
-
-  // ── Title badge: "PackSight (42)" ─────────────────────────────────────────────
-  const updateTitle = (): void => {
-    const total = treeProvider.getTotalCount();
-    // treeView.title replaces the view's "name" entirely — no prepending occurs.
-    treeView.title = total > 0 ? `Packages (${total})` : 'Packages';
-  };
-
-  // Re-run title update whenever the tree data changes
-  const titleUpdateDisposable = treeProvider.onDidChangeTreeData(() => {
-    updateTitle();
-  });
-
-  updateTitle();
 
   // ── Debounced package.json watcher ─────────────────────────────────────────
   const watcher = vscode.workspace.createFileSystemWatcher(
@@ -86,13 +73,10 @@ export function activate(context: vscode.ExtensionContext): void {
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   const scheduleRefresh = (): void => {
-    if (debounceTimer !== undefined) {
-      clearTimeout(debounceTimer);
-    }
+    if (debounceTimer !== undefined) { clearTimeout(debounceTimer); }
     debounceTimer = setTimeout(() => {
       debounceTimer = undefined;
-      treeProvider.refresh();
-      // If the dashboard is open, reload its data too (bypass cache — file changed)
+      sidebarProvider.refresh();
       if (DashboardPanel.isOpen()) {
         const panel = DashboardPanel.createOrShow(context, workspaceRoot);
         void panel.loadData(true);
@@ -104,69 +88,81 @@ export function activate(context: vscode.ExtensionContext): void {
   watcher.onDidCreate(scheduleRefresh);
   watcher.onDidDelete(scheduleRefresh);
 
-  // ── Dashboard ↔ TreeView data sync ─────────────────────────────────────────
-  // When the tree provider finishes a scan (e.g. after a right-click uninstall
-  // or update), push fresh data to the dashboard if it is open.
+  // ── Dashboard ↔ Sidebar data sync ─────────────────────────────────────────
   const dashboardSyncDisposable = dependencyChanged.event(() => {
     if (DashboardPanel.isOpen()) {
       const panel = DashboardPanel.createOrShow(context, workspaceRoot);
-      void panel.loadData(true); // bypass cache — dependencies actually changed
+      void panel.loadData(true);
     }
   });
 
   // ── Commands ───────────────────────────────────────────────────────────────
   const refreshDisposable = vscode.commands.registerCommand(
     COMMANDS.REFRESH,
-    () => refreshCommand(treeProvider)
+    () => sidebarProvider.refresh()
   );
 
   const uninstallDisposable = vscode.commands.registerCommand(
     COMMANDS.UNINSTALL,
-    (item: DependencyItem) => uninstallCommand(item, treeProvider, workspaceRoot)
+    async (arg: { packageName: string; isDev: boolean } | undefined) => {
+      if (!arg?.packageName) { return; }
+      const { packageName, isDev } = arg;
+      const terminal = vscode.window.createTerminal({ name: 'PackSight', cwd: workspaceRoot });
+      const flag = isDev ? '--save-dev' : '--save';
+      terminal.sendText(`npm uninstall ${flag} ${packageName} ; exit`);
+      terminal.show(true);
+      const d = vscode.window.onDidCloseTerminal(t => {
+        if (t === terminal) { d.dispose(); sidebarProvider.refresh(); }
+      });
+    }
   );
 
   const updateDisposable = vscode.commands.registerCommand(
     COMMANDS.UPDATE,
-    (item: DependencyItem) => updateCommand(item, treeProvider, workspaceRoot)
+    async (arg: { packageName: string } | undefined) => {
+      if (!arg?.packageName) { return; }
+      const { packageName } = arg;
+      const terminal = vscode.window.createTerminal({ name: 'PackSight', cwd: workspaceRoot });
+      terminal.sendText(`npm install ${packageName}@latest ; exit`);
+      terminal.show(true);
+      const d = vscode.window.onDidCloseTerminal(t => {
+        if (t === terminal) { d.dispose(); sidebarProvider.refresh(); }
+      });
+    }
   );
 
   const copyNameDisposable = vscode.commands.registerCommand(
     COMMANDS.COPY_PACKAGE_NAME,
-    async (item: DependencyItem) => {
-      if (item.packageName) {
-        await vscode.env.clipboard.writeText(item.packageName);
-        vscode.window.showInformationMessage(
-          `Copied "${item.packageName}" to clipboard.`
-        );
+    async (arg: { packageName: string } | undefined) => {
+      const name = arg?.packageName;
+      if (name) {
+        await vscode.env.clipboard.writeText(name);
+        vscode.window.showInformationMessage(`Copied '${name}' to clipboard.`);
       }
     }
   );
 
   // ── Toggle commands ────────────────────────────────────────────────────────
-  const toggleDisposables = registerToggleCommands(context, workspaceRoot, viewSwitchProvider);
+  const toggleDisposables = registerToggleCommands(context, workspaceRoot, sidebarProvider);
 
   // ── Open Dashboard command (Command Palette + package.json right-click) ────
   const openDashboardDisposable = vscode.commands.registerCommand(
     COMMANDS.OPEN_DASHBOARD,
     () => {
       setDashboardOpen(context, true);
-      viewSwitchProvider.setDashboardOpen(true);
+      sidebarProvider.setDashboardOpen(true);
       DashboardPanel.createOrShow(context, workspaceRoot);
     }
   );
 
-  // ── Open Link command (quick links tree) ───────────────────────────────────
+  // ── Open Link command ──────────────────────────────────────────────────────
   const openLinkDisposable = vscode.commands.registerCommand(
     COMMANDS.OPEN_LINK,
-    (url: string) => {
-      void vscode.env.openExternal(vscode.Uri.parse(url));
-    }
+    (url: string) => { void vscode.env.openExternal(vscode.Uri.parse(url)); }
   );
 
   // ── Register all disposables ───────────────────────────────────────────────
   context.subscriptions.push(
-    treeView,
-    titleUpdateDisposable,
     watcher,
     refreshDisposable,
     uninstallDisposable,

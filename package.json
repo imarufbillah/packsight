@@ -48,23 +48,9 @@
     "views": {
       "packSightContainer": [
         {
-          "id": "packSight.viewSwitch",
-          "name": "Switch View",
-          "type": "webview",
-          "when": "true",
-          "visibility": "visible"
-        },
-        {
-          "id": "packSight.dependencies",
-          "name": "Packages",
-          "contextualTitle": "PackSight"
-        },
-        {
-          "id": "packSight.quickLinks",
+          "id": "packSight.sidebar",
           "name": "PackSight",
-          "type": "webview",
-          "when": "true",
-          "visibility": "visible"
+          "type": "webview"
         }
       ]
     },
@@ -149,40 +135,6 @@
           "command": "packSight.openDashboard",
           "when": "resourceFilename == package.json",
           "group": "1_modification@-1"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "packSight.refresh",
-          "when": "view == packSight.dependencies",
-          "group": "navigation"
-        },
-        {
-          "command": "packSight.switchToDashboard",
-          "when": "view == packSight.dependencies && !packSight.dashboardOpen",
-          "group": "navigation"
-        },
-        {
-          "command": "packSight.switchToTreeView",
-          "when": "view == packSight.dependencies && packSight.dashboardOpen",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "packSight.uninstall",
-          "when": "view == packSight.dependencies && viewItem == package",
-          "group": "packSight@1"
-        },
-        {
-          "command": "packSight.update",
-          "when": "view == packSight.dependencies && viewItem == package",
-          "group": "packSight@2"
-        },
-        {
-          "command": "packSight.copyPackageName",
-          "when": "view == packSight.dependencies && viewItem == package",
-          "group": "packSight@3"
         }
       ]
     }

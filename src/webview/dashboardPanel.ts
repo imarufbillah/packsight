@@ -4,7 +4,7 @@ import { getOutdatedPackages, getPackagesLastUpdated, getPackageSizes, getPackag
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
-import { ViewSwitchWebviewProvider } from "./viewSwitchWebview";
+import { SidebarWebviewProvider } from "./sidebarWebview";
 import { CONTEXT_KEYS } from "../constants";
 import {
   DashboardData,
@@ -21,10 +21,10 @@ export class DashboardPanel {
   private static instance: DashboardPanel | undefined;
   /** Cached payload from the last successful loadData — survives panel dispose/recreate */
   private static cachedData: DashboardData | undefined;
-  /** Reference to the sidebar switch button so it stays in sync on manual close */
-  private static viewSwitchProvider: ViewSwitchWebviewProvider | undefined;
+  /** Reference to the sidebar so it stays in sync on manual close */
+  private static viewSwitchProvider: SidebarWebviewProvider | undefined;
 
-  public static setViewSwitchProvider(p: ViewSwitchWebviewProvider): void {
+  public static setViewSwitchProvider(p: SidebarWebviewProvider): void {
     DashboardPanel.viewSwitchProvider = p;
   }
 
