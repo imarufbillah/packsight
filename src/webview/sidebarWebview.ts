@@ -300,11 +300,11 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
     const links = [
       { icon: "star-full", label: "Give a Star", url: REPO },
       { icon: "book", label: "Documentation", url: `${REPO}#readme` },
-      { icon: "bug", label: "Report an Issue", url: `${REPO}/issues/new` },
+      { icon: "bug", label: "Report an Issue", url: `https://github.com/imarufbillah/packsight/issues/new/choose` },
       {
         icon: "lightbulb",
         label: "Feature Request",
-        url: `${REPO}/issues/new?labels=enhancement`,
+        url: `https://github.com/imarufbillah/packsight/issues/new/choose`,
       },
       { icon: "history", label: "Changelog", url: `${REPO}/releases` },
       {

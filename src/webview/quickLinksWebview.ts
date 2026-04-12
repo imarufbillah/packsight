@@ -11,8 +11,8 @@ interface LinkDef {
 const LINKS: LinkDef[] = [
   { icon: 'star-full',       label: 'Give a Star',       url: REPO },
   { icon: 'book',            label: 'Documentation',     url: `${REPO}#readme` },
-  { icon: 'bug',             label: 'Report an Issue',   url: `${REPO}/issues/new` },
-  { icon: 'lightbulb',       label: 'Feature Request',   url: `${REPO}/issues/new?labels=enhancement` },
+  { icon: 'bug',             label: 'Report an Issue',   url: 'https://github.com/imarufbillah/packsight/issues/new/choose' },
+  { icon: 'lightbulb',       label: 'Feature Request',   url: 'https://github.com/imarufbillah/packsight/issues/new/choose' },
   { icon: 'history',         label: 'Changelog',         url: `${REPO}/releases` },
   { icon: 'git-pull-request',label: 'Contribute',        url: `${REPO}/blob/main/CONTRIBUTING.md` },
 ];
