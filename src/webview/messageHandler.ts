@@ -25,8 +25,7 @@ export async function handleWebviewMessage(
 
     case 'uninstall': {
       const { packageName, isDev } = message;
-      // Capture version BEFORE uninstalling so we can offer revert
-      const revertVersion = message.version ?? null;
+      const revertVersion = message.version?.trim() || null;
       post({ command: 'operationStart', packageName });
       try {
         const cfg = vscode.workspace.getConfiguration('packSight');
@@ -34,9 +33,13 @@ export async function handleWebviewMessage(
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
         const saveFlag = isDev ? '--save-dev' : '--save';
         await runCommand(`npm uninstall ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
-        const revertInfo: RevertInfo | undefined = revertVersion
-          ? { packageName, version: revertVersion, isDev, kind: 'uninstall' }
-          : undefined;
+        // Always include revertInfo — even if version is unknown, use 'latest' as fallback
+        const revertInfo: RevertInfo = {
+          packageName,
+          version: revertVersion ?? 'latest',
+          isDev,
+          kind: 'uninstall',
+        };
         post({ command: 'operationSuccess', message: `Uninstalled ${packageName}`, revertInfo });
         onOptimistic(pkgs => pkgs.filter(p => p.name !== packageName));
         void onRefresh();
@@ -49,8 +52,7 @@ export async function handleWebviewMessage(
 
     case 'update': {
       const { packageName } = message;
-      // Capture old version BEFORE updating so we can offer revert
-      const oldVersion = message.oldVersion ?? null;
+      const oldVersion = message.oldVersion?.trim() || null;
       post({ command: 'operationStart', packageName });
       try {
         const flags = vscode.workspace
@@ -59,6 +61,7 @@ export async function handleWebviewMessage(
           .trim();
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
         await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
+        // Always include revertInfo when we have the old version
         const revertInfo: RevertInfo | undefined = oldVersion
           ? { packageName, version: oldVersion, isDev: message.isDev ?? false, kind: 'update' }
           : undefined;

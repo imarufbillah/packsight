@@ -1933,7 +1933,9 @@ export function getDashboardHtml(
         case 'operationSuccess':
           setLoading(false);
           showToast(msg.message, 'success');
-          if (msg.revertInfo) { addRevertEntry(msg.revertInfo); }
+          if (msg.revertInfo && msg.revertInfo.packageName) {
+            addRevertEntry(msg.revertInfo);
+          }
           break;
         case 'operationError':
           setLoading(false);
