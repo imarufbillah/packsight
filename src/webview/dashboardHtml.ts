@@ -649,7 +649,7 @@ export function getDashboardHtml(
     #confirm-modal p {
       font-size: 0.88em;
       color: var(--vscode-descriptionForeground);
-      margin-bottom: 24px;
+      margin-bottom: 16px;
       line-height: 1.6;
     }
     /* Version upgrade arrow shown in update confirm modal */
@@ -657,7 +657,7 @@ export function getDashboardHtml(
       display: none;
       align-items: center;
       gap: 10px;
-      margin: 14px 0 20px;
+      margin: 0 0 20px;
       padding: 12px 16px;
       background: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
       border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
@@ -1768,7 +1768,7 @@ export function getDashboardHtml(
         const updateBtn = pkg.latest !== null
           ? '<button class="btn-primary btn-update"' +
             ' data-name="' + esc(pkg.name) + '"' +
-            ' data-version="^' + esc(pkg.version.replace(/^[\^~>=<\s]+/, '')) + '"' +
+            ' data-version="' + esc(pkg.version.replace(/^[^\d]+/, '') || pkg.version) + '"' +
             ' data-latest="' + esc(pkg.latest ?? '') + '"' +
             ' title="Update ' + esc(pkg.name) + ' to ' + esc(pkg.latest ?? '') + '">Update</button>'
           : '';
@@ -2222,13 +2222,17 @@ export function getDashboardHtml(
         () => {
           selectedPackages.clear();
           updateBulkBar();
-          // Build oldVersions map so the handler can create revert entries
+          // Build oldVersions and isDevMap so handler can create correct revert entries
           const oldVersions = {};
+          const isDevMap = {};
           names.forEach(n => {
             const pkg = allPackages.find(p => p.name === n);
-            if (pkg) { oldVersions[n] = pkg.version.replace(/^[^\d]+/, '') || pkg.version; }
+            if (pkg) {
+              oldVersions[n] = pkg.version.replace(/^[^\d]+/, '') || pkg.version;
+              isDevMap[n] = pkg.isDev;
+            }
           });
-          vscode.postMessage({ command: 'bulkUpdate', packageNames: names, oldVersions });
+          vscode.postMessage({ command: 'bulkUpdate', packageNames: names, oldVersions, isDevMap });
         },
         null,
         bulkItems
@@ -2270,7 +2274,7 @@ export function getDashboardHtml(
       // Single-package version upgrade arrow
       const arrow = document.getElementById('confirm-version-arrow');
       if (versionInfo) {
-        document.getElementById('ver-from').textContent = versionInfo.from;
+        document.getElementById('ver-from').textContent = '^' + versionInfo.from;
         document.getElementById('ver-to').textContent   = '^' + versionInfo.to;
         const bump = bumpType(versionInfo.from, versionInfo.to);
         const bumpEl = document.getElementById('ver-bump');
@@ -2342,7 +2346,7 @@ export function getDashboardHtml(
           'Update "' + name + '" to the latest version?',
           'Update',
           'btn-primary',
-          () => vscode.postMessage({ command: 'update', packageName: name, oldVersion: from.replace(/^\^/, ''), isDev: pkgDev }),
+          () => vscode.postMessage({ command: 'update', packageName: name, oldVersion: from, isDev: pkgDev }),
           { from, to }
         );
       } else if (target.classList.contains('btn-uninstall')) {

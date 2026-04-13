@@ -80,31 +80,27 @@ export async function handleWebviewMessage(
     }
 
     case 'bulkUpdate': {
-      const { packageNames, oldVersions } = message;
+      const { packageNames, oldVersions, isDevMap } = message;
       const flags = vscode.workspace
         .getConfiguration('packSight')
         .get<string>('updateFlags', '--legacy-peer-deps')
         .trim();
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
       let failed = 0;
-      const succeeded = new Set<string>();
 
       for (const packageName of packageNames) {
         post({ command: 'operationStart', packageName });
         try {
           await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
-          succeeded.add(packageName);
-          // Optimistic update per-package as each one completes
           onOptimistic(pkgs => pkgs.map(p =>
             p.name === packageName ? { ...p, version: p.latest ?? p.version, latest: null } : p
           ));
-          // Add revert entry for each succeeded package
           const oldVer = oldVersions?.[packageName]?.trim();
           if (oldVer) {
             const revertInfo: RevertInfo = {
               packageName,
               version: oldVer,
-              isDev: false, // bulk update doesn't distinguish; revert uses --save
+              isDev: isDevMap?.[packageName] ?? false,
               kind: 'update',
             };
             post({ command: 'operationSuccess', message: `Updated ${packageName} to latest`, revertInfo });
@@ -128,12 +124,15 @@ export async function handleWebviewMessage(
       post({ command: 'operationStart', packageName });
       try {
         const cfg = vscode.workspace.getConfiguration('packSight');
+        const saveFlag = isDev ? '--save-dev' : '--save';
+        // Use install flags for restoring a specific version
         const flags = cfg.get<string>('updateFlags', '--legacy-peer-deps').trim();
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
-        const saveFlag = isDev ? '--save-dev' : '--save';
-        // Re-install the specific version (works for both uninstall revert and update downgrade)
         await runCommand(`npm install ${saveFlag} ${packageName}@${version}${flagStr}`, workspaceRoot);
         post({ command: 'operationSuccess', message: `Reverted ${packageName} to ${version}` });
+        onOptimistic(pkgs => pkgs.map(p =>
+          p.name === packageName ? { ...p, version, latest: null } : p
+        ));
         void onRefresh();
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);

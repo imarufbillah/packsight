@@ -41,7 +41,7 @@ export type WebviewMessage =
   | { command: 'ready' }
   | { command: 'uninstall'; packageName: string; isDev: boolean; version: string }
   | { command: 'update'; packageName: string; oldVersion: string; isDev: boolean }
-  | { command: 'bulkUpdate'; packageNames: string[]; oldVersions: Record<string, string> }
+  | { command: 'bulkUpdate'; packageNames: string[]; oldVersions: Record<string, string>; isDevMap?: Record<string, boolean> }
   | { command: 'refresh' }
   | { command: 'openChangelog'; url: string }
   | { command: 'openNpm'; packageName: string }
