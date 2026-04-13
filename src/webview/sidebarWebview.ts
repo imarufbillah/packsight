@@ -122,79 +122,54 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
     this.hasError = !fs.existsSync(pkgPath);
 
     if (!this.hasError) {
-      const { dependencies, devDependencies } = parseDependencies(
-        this.workspaceRoot,
-      );
-      // Merge with existing data so UI doesn't flash empty on refresh
+      const { dependencies, devDependencies } = parseDependencies(this.workspaceRoot);
+
+      // Phase 1: render immediately with basic data (no async work)
       if (this.initialLoad) {
         this.packages = [
-          ...dependencies.map((p) => ({
-            name: p.name,
-            version: p.version,
-            isDev: false,
-            isUnused: false,
-            latestVersion: null,
-          })),
-          ...devDependencies.map((p) => ({
-            name: p.name,
-            version: p.version,
-            isDev: true,
-            isUnused: false,
-            latestVersion: null,
-          })),
+          ...dependencies.map(p => ({ name: p.name, version: p.version, isDev: false, isUnused: false, latestVersion: null })),
+          ...devDependencies.map(p => ({ name: p.name, version: p.version, isDev: true, isUnused: false, latestVersion: null })),
         ];
+        this.render();
       }
-    }
 
-    this.render();
+      if (this.hasError || this.scanning) { return; }
+      this.scanning = true;
 
-    if (this.hasError || this.scanning) {
-      return;
-    }
+      setImmediate(() => {
+        void (async () => {
+          try {
+            // Phase 2: add unused detection (cached — near-instant)
+            const usedPackages = scanUsedPackages(this.workspaceRoot);
+            this.packages = [
+              ...dependencies.map(p => ({ name: p.name, version: p.version, isDev: false, isUnused: !usedPackages.has(p.name), latestVersion: null })),
+              ...devDependencies.map(p => ({ name: p.name, version: p.version, isDev: true, isUnused: !usedPackages.has(p.name), latestVersion: null })),
+            ];
+            this.initialLoad = false;
+            this.render();
 
-    this.scanning = true;
-
-    setImmediate(() => {
-      void (async () => {
-        try {
-          const { dependencies, devDependencies } = parseDependencies(
-            this.workspaceRoot,
-          );
-          const allEntries = [
-            ...dependencies.map((p) => ({ name: p.name, version: p.version })),
-            ...devDependencies.map((p) => ({
-              name: p.name,
-              version: p.version,
-            })),
-          ];
-          const usedPackages = scanUsedPackages(this.workspaceRoot);
-          const outdatedMap = await getOutdatedPackages(allEntries);
-
-          this.packages = [
-            ...dependencies.map((p) => ({
-              name: p.name,
-              version: p.version,
-              isDev: false,
-              isUnused: !usedPackages.has(p.name),
+            // Phase 3: add outdated info (network — slower)
+            const allEntries = [
+              ...dependencies.map(p => ({ name: p.name, version: p.version })),
+              ...devDependencies.map(p => ({ name: p.name, version: p.version })),
+            ];
+            const outdatedMap = await getOutdatedPackages(allEntries);
+            this.packages = this.packages.map(p => ({
+              ...p,
               latestVersion: outdatedMap.get(p.name)?.latest ?? null,
-            })),
-            ...devDependencies.map((p) => ({
-              name: p.name,
-              version: p.version,
-              isDev: true,
-              isUnused: !usedPackages.has(p.name),
-              latestVersion: outdatedMap.get(p.name)?.latest ?? null,
-            })),
-          ];
-        } catch {
-          // keep existing packages on error
-        } finally {
-          this.scanning = false;
-          this.initialLoad = false;
-          this.render();
-        }
-      })();
-    });
+            }));
+            this.render();
+          } catch {
+            // keep existing packages on error
+          } finally {
+            this.scanning = false;
+            this.initialLoad = false;
+          }
+        })();
+      });
+    } else {
+      this.render();
+    }
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────

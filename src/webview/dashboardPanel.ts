@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { parseDependencies } from "../services/dependencyService";
-import { getPackageRegistryDataBatch, getRuntimeVersions, getVulnerabilities, invalidateAuditCache } from "../services/npmService";
+import { getPackageRegistryDataBatch, getOutdatedPackages, getRuntimeVersions, getVulnerabilities, invalidateAuditCache } from "../services/npmService";
 import { scanUsedPackages } from "../services/scanService";
 import { getDashboardHtml } from "./dashboardHtml";
 import { handleWebviewMessage } from "./messageHandler";
@@ -183,8 +183,7 @@ export class DashboardPanel {
    * always gets up-to-date data when they explicitly ask for it.
    */
   public async loadData(bypassCache = false): Promise<void> {
-    // Serve stale-while-revalidate: push cached data instantly so the
-    // panel renders immediately, then fetch fresh data behind the scenes.
+    // ── Serve cache instantly ──────────────────────────────────────────────
     if (!bypassCache && DashboardPanel.cachedData) {
       void this.panel.webview.postMessage({
         command: "loadData",
@@ -192,7 +191,13 @@ export class DashboardPanel {
       } satisfies ExtensionMessage);
     }
 
-    let data: DashboardData;
+    const post = (payload: DashboardData): void => {
+      DashboardPanel.cachedData = payload;
+      void this.panel.webview.postMessage({
+        command: "loadData",
+        payload,
+      } satisfies ExtensionMessage);
+    };
 
     try {
       const pkgJsonPath = path.join(this.workspaceRoot, 'package.json');
@@ -201,37 +206,78 @@ export class DashboardPanel {
         : '';
 
       const { dependencies, devDependencies } = parseDependencies(this.workspaceRoot);
-      const usedPackages = scanUsedPackages(this.workspaceRoot);
+      const usedPackages = scanUsedPackages(this.workspaceRoot);   // cached — near-instant
+      const runtimeVersions = await getRuntimeVersions();          // cached after first call
 
       const allEntries = [
         ...dependencies.map((p) => ({ ...p, isDev: false })),
         ...devDependencies.map((p) => ({ ...p, isDev: true })),
       ];
 
-      // Single batched registry call + runtime + audit in parallel
-      // (was 6 separate parallel fetches totalling ~30 child processes)
-      const [registryMap, runtimeVersions, vulnMap] = await Promise.all([
-        getPackageRegistryDataBatch(allEntries),
-        getRuntimeVersions(),
-        getVulnerabilities(this.workspaceRoot, pkgJsonContent),
-      ]);
-
-      data = {
+      const base = {
         workspaceRoot: this.workspaceRoot,
         nodeVersion: runtimeVersions.node,
         npmVersion: runtimeVersions.npm,
-        // Carry forward the persisted revert history — never overwrite it here
         revertHistory: DashboardPanel.cachedData?.revertHistory,
-        packages: allEntries.map((entry) => {
-          const reg = registryMap.get(entry.name);
+      };
+
+      // ── Phase 1: render immediately with basic data (no registry calls) ──
+      // Only send if we have no cache — avoids a redundant re-render
+      if (!DashboardPanel.cachedData || bypassCache) {
+        post({
+          ...base,
+          packages: allEntries.map(entry => ({
+            name: entry.name,
+            version: entry.version,
+            latest: null,
+            isUnused: !usedPackages.has(entry.name),
+            isDev: entry.isDev,
+            lastUpdated: null,
+            size: null,
+            repoUrl: null,
+            vulnSeverity: null,
+          })),
+        });
+      }
+
+      // ── Phase 2: outdated check (fast — one npm view per package) ─────────
+      const outdatedMap = await getOutdatedPackages(allEntries);
+
+      post({
+        ...base,
+        packages: allEntries.map(entry => {
           const installed = entry.version.replace(/^[^\d]+/, '') || entry.version;
-          const latest = reg?.latest && reg.latest !== installed
-            ? reg.latest
-            : null;
+          const outdated = outdatedMap.get(entry.name);
           return {
             name: entry.name,
             version: entry.version,
-            latest,
+            latest: outdated?.latest ?? null,
+            isUnused: !usedPackages.has(entry.name),
+            isDev: entry.isDev,
+            lastUpdated: null,
+            size: null,
+            repoUrl: null,
+            vulnSeverity: null,
+          };
+        }),
+      });
+
+      // ── Phase 3: full registry data + audit (slower, background) ──────────
+      const [registryMap, vulnMap] = await Promise.all([
+        getPackageRegistryDataBatch(allEntries),
+        getVulnerabilities(this.workspaceRoot, pkgJsonContent),
+      ]);
+
+      post({
+        ...base,
+        packages: allEntries.map(entry => {
+          const reg = registryMap.get(entry.name);
+          const installed = entry.version.replace(/^[^\d]+/, '') || entry.version;
+          const latest = reg?.latest && reg.latest !== installed ? reg.latest : null;
+          return {
+            name: entry.name,
+            version: entry.version,
+            latest: latest ?? outdatedMap.get(entry.name)?.latest ?? null,
             isUnused: !usedPackages.has(entry.name),
             isDev: entry.isDev,
             lastUpdated: reg?.lastUpdated ?? null,
@@ -240,22 +286,22 @@ export class DashboardPanel {
             vulnSeverity: vulnMap.get(entry.name) ?? null,
           };
         }),
-      };
+      });
+
     } catch {
-      data = {
+      const fallback: DashboardData = {
         workspaceRoot: this.workspaceRoot,
         packages: [],
         nodeVersion: null,
         npmVersion: null,
         revertHistory: DashboardPanel.cachedData?.revertHistory,
       };
+      DashboardPanel.cachedData = fallback;
+      void this.panel.webview.postMessage({
+        command: "loadData",
+        payload: fallback,
+      } satisfies ExtensionMessage);
     }
-
-    DashboardPanel.cachedData = data;
-    void this.panel.webview.postMessage({
-      command: "loadData",
-      payload: data,
-    } satisfies ExtensionMessage);
   }
 
   /**
