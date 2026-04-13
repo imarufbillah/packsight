@@ -20,8 +20,8 @@ type SidebarMessage =
   | { command: "refresh" }
   | { command: "switchToDashboard" }
   | { command: "switchToTreeView" }
-  | { command: "uninstall"; packageName: string; isDev: boolean }
-  | { command: "update"; packageName: string }
+  | { command: "uninstall"; packageName: string; isDev: boolean; version: string }
+  | { command: "update"; packageName: string; oldVersion: string; isDev: boolean }
   | { command: "copyName"; packageName: string }
   | { command: "openUrl"; url: string };
 
@@ -46,8 +46,8 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
     private readonly extensionUri: vscode.Uri,
     private readonly workspaceRoot: string,
     private readonly onRefresh: () => void,
-    private readonly onUninstall: (name: string, isDev: boolean) => void,
-    private readonly onUpdate: (name: string) => void,
+    private readonly onUninstall: (name: string, isDev: boolean, version: string) => void,
+    private readonly onUpdate: (name: string, oldVersion: string, isDev: boolean) => void,
     private readonly onCopyName: (name: string) => void,
     private readonly onSwitchToDashboard: () => void,
     private readonly onSwitchToTreeView: () => void,
@@ -81,10 +81,10 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
           this.onSwitchToTreeView();
           break;
         case "uninstall":
-          this.onUninstall(msg.packageName, msg.isDev);
+          this.onUninstall(msg.packageName, msg.isDev, msg.version);
           break;
         case "update":
-          this.onUpdate(msg.packageName);
+          this.onUpdate(msg.packageName, msg.oldVersion, msg.isDev);
           break;
         case "copyName":
           this.onCopyName(msg.packageName);
@@ -258,9 +258,9 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
           ${badges}
         </div>
         <div class="pkg-actions">
-          ${isOutdated ? `<button class="act-btn act-update" title="Update to ${p.latestVersion}" onclick="update('${name}','${p.latestVersion}')"><span class="codicon codicon-arrow-up"></span></button>` : ""}
+          ${isOutdated ? `<button class="act-btn act-update" title="Update to ${p.latestVersion}" onclick="update('${name}','${p.latestVersion}','${p.version.replace(/^[^\\d]+/,'')}',${p.isDev})"><span class="codicon codicon-arrow-up"></span></button>` : ""}
           <button class="act-btn act-copy" title="Copy name" onclick="copyName('${name}')"><span class="codicon codicon-copy"></span></button>
-          <button class="act-btn act-remove" title="Uninstall" onclick="uninstall('${name}',${p.isDev})"><span class="codicon codicon-trash"></span></button>
+          <button class="act-btn act-remove" title="Uninstall" onclick="uninstall('${name}',${p.isDev},'${p.version.replace(/^[^\\d]+/,'')}')"><span class="codicon codicon-trash"></span></button>
         </div>
       </div>`;
     };
@@ -721,20 +721,20 @@ export class SidebarWebviewProvider implements vscode.WebviewViewProvider {
       if (e.key === 'Escape') closeConfirm();
     });
 
-    function update(name, latest) {
+    function update(name, latest, oldVersion, isDev) {
       showConfirm(
         'Update Package',
         'Update "' + name + '" to the latest version' + (latest ? ' (' + latest + ')' : '') + '?',
         'Update', 'confirm-ok-primary',
-        () => post('update', { packageName: name })
+        () => post('update', { packageName: name, oldVersion: oldVersion || '', isDev: !!isDev })
       );
     }
-    function uninstall(name, isDev) {
+    function uninstall(name, isDev, version) {
       showConfirm(
         'Uninstall Package',
         'Are you sure you want to uninstall "' + name + '"? This cannot be undone.',
         'Uninstall', 'confirm-ok-danger',
-        () => post('uninstall', { packageName: name, isDev })
+        () => post('uninstall', { packageName: name, isDev, version: version || '' })
       );
     }
 

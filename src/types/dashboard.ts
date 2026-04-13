@@ -26,14 +26,15 @@ export interface DashboardData {
 
 export type WebviewMessage =
   | { command: 'ready' }
-  | { command: 'uninstall'; packageName: string; isDev: boolean }
-  | { command: 'update'; packageName: string }
+  | { command: 'uninstall'; packageName: string; isDev: boolean; version: string }
+  | { command: 'update'; packageName: string; oldVersion: string; isDev: boolean }
   | { command: 'bulkUpdate'; packageNames: string[] }
   | { command: 'refresh' }
   | { command: 'openChangelog'; url: string }
   | { command: 'openNpm'; packageName: string }
   | { command: 'searchPackages'; query: string }
-  | { command: 'installPackage'; packageName: string; isDev: boolean };
+  | { command: 'installPackage'; packageName: string; isDev: boolean }
+  | { command: 'revert'; packageName: string; version: string; isDev: boolean };
 
 // ─── Messages: Extension → Webview ───────────────────────────────────────────
 
@@ -45,10 +46,20 @@ export interface NpmSearchResult {
   weeklyDownloads: number | null;
 }
 
+/** Enough information to undo an uninstall or update */
+export interface RevertInfo {
+  packageName: string;
+  /** Version to restore — the installed version before the operation */
+  version: string;
+  isDev: boolean;
+  /** 'uninstall' = re-install the package; 'update' = downgrade to old version */
+  kind: 'uninstall' | 'update';
+}
+
 export type ExtensionMessage =
   | { command: 'loadData'; payload: DashboardData }
   | { command: 'operationStart'; packageName: string }
-  | { command: 'operationSuccess'; message: string }
+  | { command: 'operationSuccess'; message: string; revertInfo?: RevertInfo }
   | { command: 'operationError'; message: string }
   | { command: 'searchResults'; results: NpmSearchResult[] }
   | { command: 'searchError'; message: string };

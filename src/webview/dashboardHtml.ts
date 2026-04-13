@@ -851,7 +851,7 @@ export function getDashboardHtml(
       border-radius: var(--radius-md);
       font-size: 0.86em;
       z-index: 200;
-      max-width: 320px;
+      max-width: 360px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.3);
       opacity: 0;
       transform: translateY(10px) scale(0.97);
@@ -887,7 +887,23 @@ export function getDashboardHtml(
       color: var(--vscode-foreground);
     }
     #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
-    /* ── Changelog column (no header, right of Actions) ─────────────────── */
+    #toast-msg { flex: 1; }
+    #toast-undo {
+      flex-shrink: 0;
+      background: color-mix(in srgb, var(--accent-blue) 15%, transparent);
+      color: var(--accent-blue);
+      border: 1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent);
+      border-radius: var(--radius-sm);
+      padding: 3px 10px;
+      font-size: 0.85em;
+      font-family: var(--vscode-font-family);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+      display: none;
+    }
+    #toast-undo:hover { background: color-mix(in srgb, var(--accent-blue) 25%, transparent); }
+    #toast-undo.visible { display: inline-flex; }
     .col-changelog {
       // width: 40px;
       padding: 0 6px 0 0 !important;
@@ -1129,7 +1145,7 @@ export function getDashboardHtml(
   </div>
 
   <!-- Toast notification -->
-  <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+  <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"><span id="toast-msg"></span><button id="toast-undo">↩ Undo</button></div>
 
   <!-- Changelog tooltip (fixed-position singleton, avoids overflow clipping) -->
   <div id="ps-tooltip"></div>
@@ -1605,17 +1621,42 @@ export function getDashboardHtml(
 
     // ── Toast ──────────────────────────────────────────────────────────────
     let toastTimer = null;
-    function showToast(msg, type) {
-      const el = document.getElementById('toast');
-      el.textContent = msg;
+    let pendingRevert = null;
+
+    function showToast(msg, type, revertInfo) {
+      const el    = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-msg');
+      const undoEl = document.getElementById('toast-undo');
+      msgEl.textContent = msg;
       // reset then re-apply so transition re-fires
       el.className = type;
       requestAnimationFrame(() => el.classList.add('visible'));
       if (toastTimer) clearTimeout(toastTimer);
+
+      // Show Undo button only when revert data is available
+      pendingRevert = revertInfo || null;
+      if (pendingRevert) {
+        undoEl.classList.add('visible');
+      } else {
+        undoEl.classList.remove('visible');
+      }
+
       toastTimer = setTimeout(() => {
         el.classList.remove('visible');
-      }, 3000);
+        undoEl.classList.remove('visible');
+        pendingRevert = null;
+      }, 8000); // longer timeout so user has time to click Undo
     }
+
+    document.getElementById('toast-undo').addEventListener('click', () => {
+      if (!pendingRevert) { return; }
+      const r = pendingRevert;
+      pendingRevert = null;
+      document.getElementById('toast').classList.remove('visible');
+      document.getElementById('toast-undo').classList.remove('visible');
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+      vscode.postMessage({ command: 'revert', packageName: r.packageName, version: r.version, isDev: r.isDev });
+    });
 
     // ── Loading overlay + button lock ──────────────────────────────────────
     function setLoading(visible, label) {
@@ -1656,7 +1697,7 @@ export function getDashboardHtml(
           break;
         case 'operationSuccess':
           setLoading(false);
-          showToast(msg.message, 'success');
+          showToast(msg.message, 'success', msg.revertInfo || null);
           break;
         case 'operationError':
           setLoading(false);
@@ -2017,23 +2058,27 @@ export function getDashboardHtml(
         const name    = target.dataset.name;
         const from    = target.dataset.version;
         const to      = target.dataset.latest;
+        // Find isDev from allPackages
+        const pkgDev  = (allPackages.find(p => p.name === name) || {}).isDev || false;
         showConfirm(
           'Update Package',
           'Update "' + name + '" to the latest version?',
           'Update',
           'btn-primary',
-          () => vscode.postMessage({ command: 'update', packageName: name }),
+          () => vscode.postMessage({ command: 'update', packageName: name, oldVersion: from.replace(/^\^/, ''), isDev: pkgDev }),
           { from, to }
         );
       } else if (target.classList.contains('btn-uninstall')) {
         const name   = target.dataset.name;
         const isDev  = target.dataset.dev === 'true';
+        const pkg    = allPackages.find(p => p.name === name);
+        const ver    = pkg ? pkg.version.replace(/^[^\d]+/, '') : '';
         showConfirm(
           'Uninstall Package',
           'Are you sure you want to uninstall "' + name + '"? This cannot be undone.',
           'Uninstall',
           'btn-danger',
-          () => vscode.postMessage({ command: 'uninstall', packageName: name, isDev })
+          () => vscode.postMessage({ command: 'uninstall', packageName: name, isDev, version: ver })
         );
       }
     });

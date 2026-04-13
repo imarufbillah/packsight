@@ -39,12 +39,12 @@ export function activate(context: vscode.ExtensionContext): void {
     // onRefresh
     () => { sidebarProvider.refresh(); },
     // onUninstall
-    (name, isDev) => {
-      void vscode.commands.executeCommand(COMMANDS.UNINSTALL, { packageName: name, isDev });
+    async (name, isDev, version) => {
+      void vscode.commands.executeCommand(COMMANDS.UNINSTALL, { packageName: name, isDev, version });
     },
     // onUpdate
-    (name) => {
-      void vscode.commands.executeCommand(COMMANDS.UPDATE, { packageName: name });
+    async (name, oldVersion, isDev) => {
+      void vscode.commands.executeCommand(COMMANDS.UPDATE, { packageName: name, oldVersion, isDev });
     },
     // onCopyName
     async (name) => {
@@ -113,9 +113,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const uninstallDisposable = vscode.commands.registerCommand(
     COMMANDS.UNINSTALL,
-    async (arg: { packageName: string; isDev: boolean } | undefined) => {
+    async (arg: { packageName: string; isDev: boolean; version?: string } | undefined) => {
       if (!arg?.packageName) { return; }
-      const { packageName, isDev } = arg;
+      const { packageName, isDev, version } = arg;
       const cfg = vscode.workspace.getConfiguration('packSight');
       const flags = cfg.get<string>('uninstallFlags', '--legacy-peer-deps').trim();
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
@@ -123,6 +123,18 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         await runCommand(`npm uninstall ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
         sidebarProvider.refresh();
+        // Offer Undo via native VS Code notification
+        if (version) {
+          const choice = await vscode.window.showInformationMessage(
+            `Uninstalled ${packageName}`,
+            'Undo'
+          );
+          if (choice === 'Undo') {
+            await runCommand(`npm install ${saveFlag} ${packageName}@${version}${flagStr}`, workspaceRoot);
+            sidebarProvider.refresh();
+            vscode.window.showInformationMessage(`Reverted: reinstalled ${packageName}@${version}`);
+          }
+        }
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         vscode.window.showErrorMessage(`Could not uninstall ${packageName} — ${detail}`);
@@ -132,15 +144,28 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const updateDisposable = vscode.commands.registerCommand(
     COMMANDS.UPDATE,
-    async (arg: { packageName: string } | undefined) => {
+    async (arg: { packageName: string; oldVersion?: string; isDev?: boolean } | undefined) => {
       if (!arg?.packageName) { return; }
-      const { packageName } = arg;
+      const { packageName, oldVersion, isDev } = arg;
       const cfg = vscode.workspace.getConfiguration('packSight');
       const flags = cfg.get<string>('updateFlags', '--legacy-peer-deps').trim();
       const flagStr = flags.length > 0 ? ` ${flags}` : '';
       try {
         await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
         sidebarProvider.refresh();
+        // Offer Undo via native VS Code notification
+        if (oldVersion) {
+          const saveFlag = isDev ? '--save-dev' : '--save';
+          const choice = await vscode.window.showInformationMessage(
+            `Updated ${packageName} to latest`,
+            'Undo'
+          );
+          if (choice === 'Undo') {
+            await runCommand(`npm install ${saveFlag} ${packageName}@${oldVersion}${flagStr}`, workspaceRoot);
+            sidebarProvider.refresh();
+            vscode.window.showInformationMessage(`Reverted: downgraded ${packageName} to ${oldVersion}`);
+          }
+        }
       } catch (err: unknown) {
         const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
         vscode.window.showErrorMessage(`Could not update ${packageName} — ${detail}`);

@@ -1,25 +1,11 @@
 import * as vscode from 'vscode';
 import { runCommand, searchNpmPackages } from '../services/npmService';
-import { DashboardPackage, ExtensionMessage, WebviewMessage } from '../types/dashboard';
+import { DashboardPackage, ExtensionMessage, RevertInfo, WebviewMessage } from '../types/dashboard';
 
 type OptimisticMutator = (
   packages: DashboardPackage[]
 ) => DashboardPackage[];
 
-/**
- * Handles a postMessage arriving from the webview.
- *
- * Uses `runCommand` (child_process.exec) rather than `runInTerminal` so that:
- *  - Operations run silently in the background (no terminal window pops up)
- *  - We get a real success/failure signal to post back to the webview
- *  - Works cross-platform (no `; exit` shell separator needed)
- *
- * @param message          - Discriminated-union message from the webview
- * @param webview          - The panel's webview (used to post replies)
- * @param workspaceRoot    - Absolute path to the workspace root
- * @param onRefresh        - Callback that re-fetches data and sends loadData
- * @param onOptimistic     - Callback that mutates the cache and posts instantly
- */
 export async function handleWebviewMessage(
   message: WebviewMessage,
   webview: vscode.Webview,
@@ -39,6 +25,8 @@ export async function handleWebviewMessage(
 
     case 'uninstall': {
       const { packageName, isDev } = message;
+      // Capture version BEFORE uninstalling so we can offer revert
+      const revertVersion = message.version ?? null;
       post({ command: 'operationStart', packageName });
       try {
         const cfg = vscode.workspace.getConfiguration('packSight');
@@ -46,7 +34,10 @@ export async function handleWebviewMessage(
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
         const saveFlag = isDev ? '--save-dev' : '--save';
         await runCommand(`npm uninstall ${saveFlag} ${packageName}${flagStr}`, workspaceRoot);
-        post({ command: 'operationSuccess', message: `Uninstalled ${packageName}` });
+        const revertInfo: RevertInfo | undefined = revertVersion
+          ? { packageName, version: revertVersion, isDev, kind: 'uninstall' }
+          : undefined;
+        post({ command: 'operationSuccess', message: `Uninstalled ${packageName}`, revertInfo });
         onOptimistic(pkgs => pkgs.filter(p => p.name !== packageName));
         void onRefresh();
       } catch (err: unknown) {
@@ -58,6 +49,8 @@ export async function handleWebviewMessage(
 
     case 'update': {
       const { packageName } = message;
+      // Capture old version BEFORE updating so we can offer revert
+      const oldVersion = message.oldVersion ?? null;
       post({ command: 'operationStart', packageName });
       try {
         const flags = vscode.workspace
@@ -66,7 +59,10 @@ export async function handleWebviewMessage(
           .trim();
         const flagStr = flags.length > 0 ? ` ${flags}` : '';
         await runCommand(`npm install ${packageName}@latest${flagStr}`, workspaceRoot);
-        post({ command: 'operationSuccess', message: `Updated ${packageName} to latest` });
+        const revertInfo: RevertInfo | undefined = oldVersion
+          ? { packageName, version: oldVersion, isDev: message.isDev ?? false, kind: 'update' }
+          : undefined;
+        post({ command: 'operationSuccess', message: `Updated ${packageName} to latest`, revertInfo });
         onOptimistic(pkgs => pkgs.map(p =>
           p.name === packageName
             ? { ...p, version: p.latest ?? p.version, latest: null }
@@ -114,6 +110,25 @@ export async function handleWebviewMessage(
       break;
     }
 
+    case 'revert': {
+      const { packageName, version, isDev } = message;
+      post({ command: 'operationStart', packageName });
+      try {
+        const cfg = vscode.workspace.getConfiguration('packSight');
+        const flags = cfg.get<string>('updateFlags', '--legacy-peer-deps').trim();
+        const flagStr = flags.length > 0 ? ` ${flags}` : '';
+        const saveFlag = isDev ? '--save-dev' : '--save';
+        // Re-install the specific version (works for both uninstall revert and update downgrade)
+        await runCommand(`npm install ${saveFlag} ${packageName}@${version}${flagStr}`, workspaceRoot);
+        post({ command: 'operationSuccess', message: `Reverted ${packageName} to ${version}` });
+        void onRefresh();
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message.split('\n')[0] : String(err);
+        post({ command: 'operationError', message: `Could not revert ${packageName} — ${detail}` });
+      }
+      break;
+    }
+
     case 'openChangelog': {
       const { url } = message;
       await vscode.env.openExternal(vscode.Uri.parse(url));
@@ -122,8 +137,6 @@ export async function handleWebviewMessage(
 
     case 'openNpm': {
       const { packageName } = message;
-      // executeCommand('vscode.open') bypasses the trusted-domain prompt
-      // that env.openExternal triggers for external https:// URLs.
       await vscode.commands.executeCommand(
         'vscode.open',
         vscode.Uri.parse(`https://www.npmjs.com/package/${encodeURIComponent(packageName)}`)
