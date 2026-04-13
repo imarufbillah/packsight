@@ -886,24 +886,177 @@ export function getDashboardHtml(
       border: 1px solid color-mix(in srgb, var(--accent-red) 35%, transparent);
       color: var(--vscode-foreground);
     }
-    #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
-    #toast-msg { flex: 1; }
-    #toast-undo {
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      padding: 11px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.86em;
+      z-index: 200;
+      max-width: 320px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #toast::before {
+      content: '';
+      display: block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
       flex-shrink: 0;
-      background: color-mix(in srgb, var(--accent-blue) 15%, transparent);
-      color: var(--accent-blue);
-      border: 1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent);
+    }
+    #toast.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    #toast.success {
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid color-mix(in srgb, var(--accent-green) 35%, transparent);
+      color: var(--vscode-foreground);
+    }
+    #toast.success::before { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+    #toast.error {
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid color-mix(in srgb, var(--accent-red) 35%, transparent);
+      color: var(--vscode-foreground);
+    }
+    #toast.error::before { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+
+    /* ── Revert history panel ─────────────────────────────────────────────── */
+    #btn-revert-history { position: relative; }
+    #revert-badge {
+      position: absolute;
+      top: -5px; right: -5px;
+      background: var(--accent-red);
+      color: #fff;
+      border-radius: 50%;
+      width: 16px; height: 16px;
+      font-size: 0.65em;
+      font-weight: 700;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    #revert-badge.visible { display: flex; }
+    #revert-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      z-index: 400;
+      align-items: flex-start;
+      justify-content: flex-end;
+    }
+    #revert-backdrop.visible { display: flex; }
+    #revert-panel {
+      width: 380px;
+      max-width: 95vw;
+      height: 100vh;
+      background: var(--vscode-editorWidget-background);
+      border-left: 1px solid color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.3);
+      animation: slideInRight 0.22s cubic-bezier(0.4,0,0.2,1) both;
+    }
+    .revert-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      flex-shrink: 0;
+    }
+    .revert-header h2 {
+      font-family: 'Syne', var(--vscode-font-family), sans-serif;
+      font-size: 1.05em;
+      font-weight: 700;
+      color: var(--vscode-foreground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #revert-close {
+      background: transparent;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 4px;
       border-radius: var(--radius-sm);
-      padding: 3px 10px;
-      font-size: 0.85em;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      transition: color var(--transition-fast), background var(--transition-fast);
+    }
+    #revert-close:hover { color: var(--vscode-foreground); background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent); }
+    #revert-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .revert-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 100%;
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.88em;
+      padding: 40px 20px;
+      text-align: center;
+      opacity: 0.7;
+    }
+    .revert-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 40%, transparent);
+      transition: background var(--transition-fast);
+    }
+    .revert-item:last-child { border-bottom: none; }
+    .revert-item:hover { background: color-mix(in srgb, var(--vscode-list-hoverBackground) 100%, transparent); }
+    .revert-icon { font-size: 15px; flex-shrink: 0; }
+    .revert-icon-uninstall { color: var(--accent-red); }
+    .revert-icon-update    { color: var(--accent-blue); }
+    .revert-info { flex: 1; min-width: 0; }
+    .revert-name { font-size: 0.88em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .revert-detail { font-size: 0.76em; color: var(--vscode-descriptionForeground); font-family: 'JetBrains Mono', var(--vscode-editor-font-family, monospace), monospace; margin-top: 2px; }
+    .revert-action-label { font-size: 0.70em; font-weight: 600; padding: 1px 6px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .revert-action-uninstall { color: var(--accent-red); background: color-mix(in srgb, var(--accent-red) 12%, transparent); }
+    .revert-action-update    { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 12%, transparent); }
+    .btn-revert-item {
+      flex-shrink: 0;
+      background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+      color: var(--vscode-foreground);
+      border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      border-radius: var(--radius-sm);
+      padding: 4px 10px;
+      font-size: 0.78em;
       font-family: var(--vscode-font-family);
       font-weight: 600;
       cursor: pointer;
-      transition: background 120ms;
-      display: none;
+      transition: background var(--transition-fast);
+      white-space: nowrap;
     }
-    #toast-undo:hover { background: color-mix(in srgb, var(--accent-blue) 25%, transparent); }
-    #toast-undo.visible { display: inline-flex; }
+    .btn-revert-item:hover { background: color-mix(in srgb, var(--vscode-foreground) 14%, transparent); }
+    .revert-footer {
+      padding: 12px 16px;
+      border-top: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      display: flex;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
     .col-changelog {
       // width: 40px;
       padding: 0 6px 0 0 !important;
@@ -1145,7 +1298,7 @@ export function getDashboardHtml(
   </div>
 
   <!-- Toast notification -->
-  <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"><span id="toast-msg"></span><button id="toast-undo">↩ Undo</button></div>
+  <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
   <!-- Changelog tooltip (fixed-position singleton, avoids overflow clipping) -->
   <div id="ps-tooltip"></div>
@@ -1163,6 +1316,9 @@ export function getDashboardHtml(
           <span id="scale-label">100%</span>
           <button class="scale-btn" id="btn-scale-up" aria-label="Increase UI scale">+</button>
         </div>
+        <button class="btn-secondary" id="btn-revert-history" title="Revert history">
+          ↩ History<span id="revert-badge"></span>
+        </button>
         <button class="btn-secondary" id="btn-browse">
           <svg class="icon" viewBox="0 0 512 448" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path fill-rule="evenodd" d="M192 0v160H80L256 336 432 160H320V0H192zM0 288v160h512V288H384L256 416 128 288H0zm416 32h64v64h-64v-64z"/></svg>
           Browse &amp; Install
@@ -1297,6 +1453,20 @@ export function getDashboardHtml(
           <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" fill="currentColor"/></svg>
           <span>Search for any npm package to browse and install it into your project.</span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revert history panel -->
+  <div id="revert-backdrop" role="dialog" aria-modal="true" aria-labelledby="revert-panel-title">
+    <div id="revert-panel">
+      <div class="revert-header">
+        <h2 id="revert-panel-title">↩ Revert History</h2>
+        <button id="revert-close" aria-label="Close revert history"><span class="codicon codicon-close"></span></button>
+      </div>
+      <div id="revert-list"></div>
+      <div class="revert-footer">
+        <button class="btn-secondary" id="btn-clear-history">Clear History</button>
       </div>
     </div>
   </div>
@@ -1621,41 +1791,106 @@ export function getDashboardHtml(
 
     // ── Toast ──────────────────────────────────────────────────────────────
     let toastTimer = null;
-    let pendingRevert = null;
-
-    function showToast(msg, type, revertInfo) {
-      const el    = document.getElementById('toast');
-      const msgEl = document.getElementById('toast-msg');
-      const undoEl = document.getElementById('toast-undo');
-      msgEl.textContent = msg;
-      // reset then re-apply so transition re-fires
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
       el.className = type;
       requestAnimationFrame(() => el.classList.add('visible'));
       if (toastTimer) clearTimeout(toastTimer);
-
-      // Show Undo button only when revert data is available
-      pendingRevert = revertInfo || null;
-      if (pendingRevert) {
-        undoEl.classList.add('visible');
-      } else {
-        undoEl.classList.remove('visible');
-      }
-
-      toastTimer = setTimeout(() => {
-        el.classList.remove('visible');
-        undoEl.classList.remove('visible');
-        pendingRevert = null;
-      }, 8000); // longer timeout so user has time to click Undo
+      toastTimer = setTimeout(() => { el.classList.remove('visible'); }, 3000);
     }
 
-    document.getElementById('toast-undo').addEventListener('click', () => {
-      if (!pendingRevert) { return; }
-      const r = pendingRevert;
-      pendingRevert = null;
-      document.getElementById('toast').classList.remove('visible');
-      document.getElementById('toast-undo').classList.remove('visible');
-      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-      vscode.postMessage({ command: 'revert', packageName: r.packageName, version: r.version, isDev: r.isDev });
+    // ── Revert history ─────────────────────────────────────────────────────
+    const MAX_HISTORY = 20;
+    let revertHistory = []; // { id, kind, packageName, version, isDev, label, time }
+    let revertIdSeq   = 0;
+
+    function addRevertEntry(revertInfo) {
+      if (!revertInfo) { return; }
+      const entry = {
+        id:          ++revertIdSeq,
+        kind:        revertInfo.kind,        // 'uninstall' | 'update'
+        packageName: revertInfo.packageName,
+        version:     revertInfo.version,
+        isDev:       revertInfo.isDev,
+        label:       revertInfo.kind === 'uninstall'
+                       ? 'Uninstalled'
+                       : 'Updated (was ' + revertInfo.version + ')',
+        time:        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      revertHistory.unshift(entry);
+      if (revertHistory.length > MAX_HISTORY) { revertHistory.pop(); }
+      updateRevertBadge();
+    }
+
+    function updateRevertBadge() {
+      const badge = document.getElementById('revert-badge');
+      if (revertHistory.length > 0) {
+        badge.textContent = revertHistory.length > 9 ? '9+' : String(revertHistory.length);
+        badge.classList.add('visible');
+      } else {
+        badge.classList.remove('visible');
+      }
+    }
+
+    function renderRevertList() {
+      const list = document.getElementById('revert-list');
+      if (revertHistory.length === 0) {
+        list.innerHTML = '<div class="revert-empty"><svg width="32" height="32" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 3a.5.5 0 0 1 .5.5v3.25l2.25 1.3a.5.5 0 0 1-.5.866L7.75 9.6A.5.5 0 0 1 7.5 9.5V4a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg><span>No revertable actions yet.<br/>Update or uninstall a package to see it here.</span></div>';
+        return;
+      }
+      list.innerHTML = revertHistory.map(e => {
+        const iconCls = e.kind === 'uninstall' ? 'revert-icon-uninstall codicon-trash' : 'revert-icon-update codicon-arrow-up';
+        const labelCls = e.kind === 'uninstall' ? 'revert-action-uninstall' : 'revert-action-update';
+        const detail   = e.kind === 'uninstall'
+          ? 'Restore ' + e.version + (e.isDev ? ' (dev)' : '')
+          : 'Downgrade to ' + e.version;
+        return '<div class="revert-item">' +
+          '<span class="revert-icon codicon ' + iconCls + '"></span>' +
+          '<div class="revert-info">' +
+            '<div class="revert-name">' + esc(e.packageName) + ' <span class="revert-action-label ' + labelCls + '">' + e.label.split(' ')[0] + '</span></div>' +
+            '<div class="revert-detail">' + esc(detail) + ' &nbsp;·&nbsp; ' + e.time + '</div>' +
+          '</div>' +
+          '<button class="btn-revert-item" data-id="' + e.id + '">↩ Revert</button>' +
+        '</div>';
+      }).join('');
+    }
+
+    function openRevertPanel() {
+      renderRevertList();
+      document.getElementById('revert-backdrop').classList.add('visible');
+    }
+    function closeRevertPanel() {
+      document.getElementById('revert-backdrop').classList.remove('visible');
+    }
+
+    document.getElementById('btn-revert-history').addEventListener('click', openRevertPanel);
+    document.getElementById('revert-close').addEventListener('click', closeRevertPanel);
+    document.getElementById('revert-backdrop').addEventListener('click', e => {
+      if (e.target === document.getElementById('revert-backdrop')) closeRevertPanel();
+    });
+    document.getElementById('btn-clear-history').addEventListener('click', () => {
+      revertHistory = [];
+      updateRevertBadge();
+      renderRevertList();
+    });
+    document.getElementById('revert-list').addEventListener('click', e => {
+      const btn = e.target.closest('.btn-revert-item');
+      if (!btn) { return; }
+      const id    = parseInt(btn.dataset.id, 10);
+      const entry = revertHistory.find(x => x.id === id);
+      if (!entry) { return; }
+      // Remove from history so it can't be reverted twice
+      revertHistory = revertHistory.filter(x => x.id !== id);
+      updateRevertBadge();
+      renderRevertList();
+      closeRevertPanel();
+      vscode.postMessage({ command: 'revert', packageName: entry.packageName, version: entry.version, isDev: entry.isDev });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('revert-backdrop').classList.contains('visible')) {
+        closeRevertPanel();
+      }
     });
 
     // ── Loading overlay + button lock ──────────────────────────────────────
@@ -1697,7 +1932,8 @@ export function getDashboardHtml(
           break;
         case 'operationSuccess':
           setLoading(false);
-          showToast(msg.message, 'success', msg.revertInfo || null);
+          showToast(msg.message, 'success');
+          if (msg.revertInfo) { addRevertEntry(msg.revertInfo); }
           break;
         case 'operationError':
           setLoading(false);
