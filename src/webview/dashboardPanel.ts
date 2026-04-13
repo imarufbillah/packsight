@@ -220,6 +220,8 @@ export class DashboardPanel {
         workspaceRoot: this.workspaceRoot,
         nodeVersion: runtimeVersions.node,
         npmVersion: runtimeVersions.npm,
+        // Carry forward the persisted revert history — never overwrite it here
+        revertHistory: DashboardPanel.cachedData?.revertHistory,
         packages: allEntries.map((entry) => {
           const reg = registryMap.get(entry.name);
           const installed = entry.version.replace(/^[^\d]+/, '') || entry.version;
@@ -240,7 +242,13 @@ export class DashboardPanel {
         }),
       };
     } catch {
-      data = { workspaceRoot: this.workspaceRoot, packages: [], nodeVersion: null, npmVersion: null };
+      data = {
+        workspaceRoot: this.workspaceRoot,
+        packages: [],
+        nodeVersion: null,
+        npmVersion: null,
+        revertHistory: DashboardPanel.cachedData?.revertHistory,
+      };
     }
 
     DashboardPanel.cachedData = data;
