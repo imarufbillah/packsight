@@ -1795,10 +1795,10 @@ export function getDashboardHtml(
               data-tooltip-resolve="View advisories for \${esc(pkg.name)}"
               data-tooltip-changelog="View Releases on GitHub">
               \${pkg.vulnSeverity
-                ? \`<button class="btn-vuln-resolve codicon codicon-shield" data-url="https://www.npmjs.com/package/\${esc(pkg.name)}?activeTab=advisories" aria-label="View advisories for \${esc(pkg.name)}"></button>\`
+                ? '<button class="btn-vuln-resolve codicon codicon-shield" data-url="https://www.npmjs.com/package/' + esc(pkg.name) + '?activeTab=advisories" aria-label="View advisories for ' + esc(pkg.name) + '"></button>'
                 : ''}
               \${pkg.repoUrl
-                ? \`<button class="btn-changelog codicon codicon-book" data-url="\${esc(pkg.repoUrl)}" aria-label="View releases for \${esc(pkg.name)} on GitHub"></button>\`
+                ? '<button class="btn-changelog codicon codicon-book" data-url="' + esc(pkg.repoUrl) + '" aria-label="View releases for ' + esc(pkg.name) + ' on GitHub"></button>'
                 : ''}
             </span>
           </td>
