@@ -1762,47 +1762,47 @@ export function getDashboardHtml(
         const SHIELD_VULN = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2 4v4c0 3.31 2.5 5.8 6 6.5 3.5-.7 6-3.19 6-6.5V4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 15%, transparent)"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
         const SHIELD_OK   = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5 L2 4v4c0 3.31 2.5 5.8 6 6.5 3.5-.7 6-3.19 6-6.5V4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 15%, transparent)"/><path d="M5.5 8l1.8 1.8L10.5 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         const vulnIcon = pkg.vulnSeverity
-          ? \`<span class="vuln-icon vuln-\${pkg.vulnSeverity}" data-vuln="\${pkg.vulnSeverity}" aria-label="\${pkg.vulnSeverity} vulnerability">\${SHIELD_VULN}</span>\`
-          : \`<span class="vuln-icon vuln-secure" data-vuln="secure" aria-label="No known vulnerabilities">\${SHIELD_OK}</span>\`;
+          ? '<span class="vuln-icon vuln-' + pkg.vulnSeverity + '" data-vuln="' + pkg.vulnSeverity + '" aria-label="' + pkg.vulnSeverity + ' vulnerability">' + SHIELD_VULN + '</span>'
+          : '<span class="vuln-icon vuln-secure" data-vuln="secure" aria-label="No known vulnerabilities">' + SHIELD_OK + '</span>';
 
         const updateBtn = pkg.latest !== null
-          ? \`<button class="btn-primary btn-update"
-               data-name="\${esc(pkg.name)}"
-               data-version="^\${esc(pkg.version.replace(/^[\\^~>=<\\s]+/, ''))}"
-               data-latest="\${esc(pkg.latest ?? '')}"
-               title="Update \${esc(pkg.name)} to \${esc(pkg.latest ?? '')}">Update</button>\`
+          ? '<button class="btn-primary btn-update"' +
+            ' data-name="' + esc(pkg.name) + '"' +
+            ' data-version="^' + esc(pkg.version.replace(/^[\^~>=<\s]+/, '')) + '"' +
+            ' data-latest="' + esc(pkg.latest ?? '') + '"' +
+            ' title="Update ' + esc(pkg.name) + ' to ' + esc(pkg.latest ?? '') + '">Update</button>'
           : '';
 
-        return \`<tr>
-          <td class="col-check">\${pkg.latest !== null
-            ? \`<input type="checkbox" class="row-check" data-name="\${esc(pkg.name)}" \${selectedPackages.has(pkg.name) ? 'checked' : ''} title="Select for bulk update" />\`
-            : ''}</td>
-          <td class="col-name"><span class="pkg-name-link" data-name="\${esc(pkg.name)}">\${esc(pkg.name)}</span>\${vulnIcon}\${devTag}</td>
-          <td class="col-version">^\${esc(pkg.version.replace(/^[\\^~>=<\\s]+/, ''))}</td>
-          <td class="col-latest">\${latestCell}</td>
-          <td class="col-date" data-iso="\${pkg.lastUpdated ? esc(pkg.lastUpdated) : ''}"><span class="date-text">\${formatDate(pkg.lastUpdated)}</span></td>
-          <td class="col-size">\${formatSize(pkg.size)}</td>
-          <td>\${statusBadge(pkg)}</td>
-          <td class="actions-cell">
-            \${updateBtn}
-            <button class="btn-danger btn-uninstall"
-              data-name="\${esc(pkg.name)}"
-              data-dev="\${pkg.isDev}"
-              title="Uninstall \${esc(pkg.name)}">Uninstall</button>
-          </td>
-          <td class="col-changelog">
-            <span class="btn-changelog-wrap"
-              data-tooltip-resolve="View advisories for \${esc(pkg.name)}"
-              data-tooltip-changelog="View Releases on GitHub">
-              \${pkg.vulnSeverity
-                ? '<button class="btn-vuln-resolve codicon codicon-shield" data-url="https://www.npmjs.com/package/' + esc(pkg.name) + '?activeTab=advisories" aria-label="View advisories for ' + esc(pkg.name) + '"></button>'
-                : ''}
-              \${pkg.repoUrl
-                ? '<button class="btn-changelog codicon codicon-book" data-url="' + esc(pkg.repoUrl) + '" aria-label="View releases for ' + esc(pkg.name) + ' on GitHub"></button>'
-                : ''}
-            </span>
-          </td>
-        </tr>\`;
+        return '<tr>' +
+          '<td class="col-check">' + (pkg.latest !== null
+            ? '<input type="checkbox" class="row-check" data-name="' + esc(pkg.name) + '" ' + (selectedPackages.has(pkg.name) ? 'checked' : '') + ' title="Select for bulk update" />'
+            : '') + '</td>' +
+          '<td class="col-name"><span class="pkg-name-link" data-name="' + esc(pkg.name) + '">' + esc(pkg.name) + '</span>' + vulnIcon + devTag + '</td>' +
+          '<td class="col-version">^' + esc(pkg.version.replace(/^[\^~>=<\s]+/, '')) + '</td>' +
+          '<td class="col-latest">' + latestCell + '</td>' +
+          '<td class="col-date" data-iso="' + (pkg.lastUpdated ? esc(pkg.lastUpdated) : '') + '"><span class="date-text">' + formatDate(pkg.lastUpdated) + '</span></td>' +
+          '<td class="col-size">' + formatSize(pkg.size) + '</td>' +
+          '<td>' + statusBadge(pkg) + '</td>' +
+          '<td class="actions-cell">' +
+            updateBtn +
+            '<button class="btn-danger btn-uninstall"' +
+            ' data-name="' + esc(pkg.name) + '"' +
+            ' data-dev="' + pkg.isDev + '"' +
+            ' title="Uninstall ' + esc(pkg.name) + '">Uninstall</button>' +
+          '</td>' +
+          '<td class="col-changelog">' +
+            '<span class="btn-changelog-wrap"' +
+            ' data-tooltip-resolve="View advisories for ' + esc(pkg.name) + '"' +
+            ' data-tooltip-changelog="View Releases on GitHub">' +
+            (pkg.vulnSeverity
+              ? '<button class="btn-vuln-resolve codicon codicon-shield" data-url="https://www.npmjs.com/package/' + esc(pkg.name) + '?activeTab=advisories" aria-label="View advisories for ' + esc(pkg.name) + '"></button>'
+              : '') +
+            (pkg.repoUrl
+              ? '<button class="btn-changelog codicon codicon-book" data-url="' + esc(pkg.repoUrl) + '" aria-label="View releases for ' + esc(pkg.name) + ' on GitHub"></button>'
+              : '') +
+            '</span>' +
+          '</td>' +
+        '</tr>';
       }).join('');
       updateBulkBar();
     }
@@ -2471,8 +2471,6 @@ export function getDashboardHtml(
       hideTooltip();
       vscode.postMessage({ command: 'openChangelog', url: btn.dataset.url });
     });
-      if (e.target.closest('.btn-changelog')) hideTooltip();
-    }, true);
 
     // ── Runtime badge tooltips ─────────────────────────────────────────────
     document.getElementById('badge-node').addEventListener('mouseenter', e => {
